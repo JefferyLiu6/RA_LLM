@@ -17,8 +17,5 @@ outputs/lora_adapter/
 # ── Trainer binary artifacts ─────────────────────────────
 outputs/**/training_args.bin
 
-# ── Claude Code local settings ───────────────────────────
-.claude/
-
 # ── macOS ─────────────────────────────────────────────────
 .DS_Store
