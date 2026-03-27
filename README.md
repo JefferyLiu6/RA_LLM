@@ -273,6 +273,10 @@ Checks each output for all required sections and exactly 3 key-point bullets. Wr
 
 ## Experiment Results
 
+The dashboard below shows all 8 experiments at a glance — format compliance per run (bar chart), final train vs val loss (grouped bars), and the full results table.
+
+![Dashboard results tab: compliance and loss across all experiments](assets/screenshots/dashboard_results.png)
+
 The screenshot below shows the same prompt (`test_01 — softmax`) run through three configurations side by side: the untuned base model, a low-rank adapter (r=8), and a high-rank adapter (r=64).
 
 ![Rank comparison: No Adaptation vs LoRA Low Rank vs LoRA High Rank](assets/screenshots/rank_comparison.png)
@@ -300,6 +304,18 @@ Results from the hyperparameter sweep conducted after training:
 - `rank_64` and `epochs_5` both achieve 100% compliance with no overfitting (val loss tracks train loss)
 - `lr=1e-4` is too conservative — higher loss, lower compliance
 - `rank_8` is the practical floor; acceptable but noticeably weaker
+
+### Training Curves
+
+Loss over epochs for all experiments. `lr_1e-4` (teal) converges slowest; `rank_64` and `lr_5e-4` reach the lowest final loss. Validation loss closely tracks training loss across all runs — no signs of overfitting.
+
+![Training and validation loss curves over epochs](assets/screenshots/dashboard_training_curves.png)
+
+### Content Quality Analysis
+
+Beyond format compliance, the radar chart compares lexical diversity, specificity, key-point detail, and follow-up question validity across experiments. `epochs_5` scores highest on detail (longest key-point bullets); `qlora_4bit` and `rank_64` lead on lexical diversity.
+
+![Content analysis: radar chart, avg words per key point, output specificity](assets/screenshots/dashboard_content_analysis.png)
 
 ---
 
