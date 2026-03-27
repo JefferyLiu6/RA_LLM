@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LoRA Fine-Tuning — Experiment Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f8fafc;
+  --surface:   #ffffff;
+  --border:    #e2e8f0;
+  --border-sm: #f1f5f9;
+  --text:      #0f172a;
+  --text-2:    #334155;
+  --muted:     #94a3b8;
+  --accent:    #6366f1;
+  --accent-lo: #eef2ff;
+  --accent-md: rgba(99,102,241,0.15);
+  --green:     #10b981;
+  --amber:     #f59e0b;
+  --red:       #ef4444;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+  --shadow:    0 1px 3px rgba(0,0,0,.07), 0 2px 8px rgba(0,0,0,.05);
+  --radius:    8px;
+  --radius-lg: 12px;
+  --mono:      'JetBrains Mono', 'Fira Code', monospace;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* ─── Scrollbar ─────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ─── Top bar ───────────────────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  height: 52px;
+  display: flex; align-items: center;
+  padding: 0 24px; gap: 0;
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  margin-right: 32px; flex-shrink: 0;
+}
+.brand-icon {
+  width: 30px; height: 30px;
+  background: var(--accent);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.brand-icon svg { width: 16px; height: 16px; }
+.brand-name {
+  font-size: 14px; font-weight: 600; letter-spacing: -.2px;
+  color: var(--text); line-height: 1.2;
+}
+.brand-sub {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted); line-height: 1;
+}
+.tabs { display: flex; gap: 2px; flex: 1; }
+.tab {
+  padding: 5px 14px; border-radius: 6px;
+  border: none; background: none; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  color: var(--muted); transition: all .15s; white-space: nowrap;
+}
+.tab:hover { color: var(--text-2); background: var(--bg); }
+.tab.active { color: var(--accent); background: var(--accent-lo); }
+.topbar-right {
+  margin-left: auto; flex-shrink: 0;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted); padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+/* ─── Hero strip ────────────────────────────── */
+.hero {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch;
+}
+.kpi {
+  flex: 1; min-width: 130px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.kpi.highlight {
+  background: var(--accent-lo);
+  border-color: rgba(99,102,241,0.2);
+}
+.kpi-label {
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); margin-bottom: 6px;
+}
+.kpi-value {
+  font-family: var(--mono); font-size: 22px; font-weight: 600;
+  color: var(--text); line-height: 1; margin-bottom: 4px;
+}
+.kpi.highlight .kpi-value { color: var(--accent); }
+.kpi-name {
+  font-size: 11px; color: var(--muted);
+  font-family: var(--mono);
+}
+.kpi-divider {
+  width: 1px; background: var(--border);
+  margin: 4px 0; flex-shrink: 0;
+  display: none;
+}
+@media (min-width: 640px) { .kpi-divider { display: block; } }
+
+/* ─── Main ──────────────────────────────────── */
+.main {
+  max-width: 1320px; margin: 0 auto;
+  padding: 24px; display: flex; flex-direction: column; gap: 16px;
+}
+.panel { display: none; flex-direction: column; gap: 16px; }
+.panel.active {
+  display: flex;
+  animation: fade-up .2s ease both;
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.row { display: flex; gap: 16px; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 0; }
+.row-fixed > :first-child { flex: 0 0 55%; }
+.row-fixed > :last-child  { flex: 1; }
+
+/* ─── Card ──────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.card-hd {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 12px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+.card-desc {
+  font-size: 11px; color: var(--muted); margin-top: 2px;
+}
+.chart-wrap { position: relative; }
+.h240 { height: 240px; }
+.h280 { height: 280px; }
+.h320 { height: 320px; }
+.h300 { height: 300px; }
+
+/* ─── Legend ────────────────────────────────── */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--muted);
+  font-family: var(--mono);
+}
+.legend-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* ─── Table ─────────────────────────────────── */
+.tbl-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden; overflow-x: auto;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  padding: 10px 16px;
+  text-align: left; white-space: nowrap;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+tbody tr { border-bottom: 1px solid var(--border-sm); transition: background .1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--bg); }
+td { padding: 11px 16px; color: var(--text-2); vertical-align: middle; }
+.td-exp {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 500; color: var(--text); font-family: var(--mono);
+  font-size: 12px;
+}
+.td-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.td-mono { font-family: var(--mono); font-size: 12px; }
+.badge-best {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 4px;
+  background: #fef9c3; color: #854d0e;
+  border: 1px solid #fde68a;
+}
+.bar-cell { display: flex; align-items: center; gap: 8px; }
+.mini-bar {
+  height: 4px; width: 72px; background: var(--border);
+  border-radius: 2px; overflow: hidden; flex-shrink: 0;
+}
+.mini-fill { height: 100%; border-radius: 2px; }
+
+/* ─── Output viewer ─────────────────────────── */
+.viewer-ctrl {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.viewer-lbl {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); white-space: nowrap;
+}
+select {
+  font-family: var(--mono); font-size: 12px;
+  padding: 7px 32px 7px 12px; min-width: 200px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E") no-repeat right 10px center;
+  -webkit-appearance: none; appearance: none;
+  color: var(--text); cursor: pointer; outline: none;
+  transition: border-color .15s;
+}
+select:focus { border-color: var(--accent); }
+.prompt-quote {
+  background: var(--bg); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 12px 16px;
+  font-size: 13px; color: var(--text-2); line-height: 1.65;
+  display: none;
+}
+.prompt-quote.visible { display: block; }
+.out-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.out-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .15s, box-shadow .15s;
+}
+.out-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow);
+}
+.out-hd {
+  padding: 9px 14px; background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 7px;
+}
+.out-hd-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.out-hd-name {
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  color: var(--text);
+}
+.out-body {
+  padding: 14px; font-family: var(--mono); font-size: 11.5px;
+  line-height: 1.75; color: var(--text-2); white-space: pre-wrap;
+  max-height: 400px; overflow-y: auto;
+}
+.out-sec { font-weight: 700; color: var(--text); }
+
+/* ─── Empty state ───────────────────────────── */
+.empty {
+  border: 1px dashed var(--border); border-radius: var(--radius-lg);
+  background: var(--surface); text-align: center;
+  padding: 48px 24px; color: var(--muted);
+}
+.empty strong { display: block; font-size: 14px; color: var(--text-2); margin-bottom: 6px; font-weight: 500; }
+.empty code {
+  display: inline-block; margin-top: 12px;
+  font-family: var(--mono); font-size: 12px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 5px; padding: 5px 12px; color: var(--text);
+}
+
+/* ─── Before/After chat UI ──────────────────── */
+.compare-ctrl {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 16px 20px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); margin-bottom: 16px;
+}
+.chat-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.chat-win {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.chat-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg);
+}
+.chat-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 12px; font-weight: 700; color: #fff;
+}
+.chat-model-name {
+  font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;
+}
+.chat-model-sub {
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+}
+.chat-badge {
+  margin-left: auto; flex-shrink: 0;
+  font-size: 10px; font-weight: 600; padding: 2px 7px;
+  border-radius: 10px; letter-spacing: .03em;
+}
+/* badge colors set inline via style attr */
+.chat-messages {
+  padding: 14px 12px; display: flex; flex-direction: column; gap: 10px;
+  min-height: 200px; max-height: 600px; overflow-y: auto;
+}
+.chat-msg {
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.chat-msg.user { flex-direction: row-reverse; }
+.msg-icon {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; margin-top: 1px;
+}
+.msg-icon.user-icon {
+  background: var(--border); color: var(--muted);
+}
+.msg-bubble {
+  border-radius: 14px; padding: 9px 13px;
+  font-size: 12.5px; line-height: 1.65; max-width: 85%;
+}
+.chat-msg.user .msg-bubble {
+  background: var(--accent); color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.chat-msg.assistant .msg-bubble {
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text-2); border-bottom-left-radius: 4px;
+  font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap;
+}
+.chat-sec { font-weight: 700; color: var(--text); }
+.chat-typing {
+  display: flex; gap: 4px; align-items: center; padding: 12px 14px;
+}
+.chat-typing span {
+  width: 5px; height: 5px; background: var(--muted);
+  border-radius: 50%; animation: blink 1.2s infinite;
+}
+.chat-typing span:nth-child(2) { animation-delay: .2s; }
+.chat-typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink {
+  0%, 80%, 100% { opacity: .3; transform: scale(.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+.chat-footer {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  display: flex; align-items: center; gap: 8px;
+}
+.chat-footer-input {
+  flex: 1; font-family: var(--mono); font-size: 11px;
+  color: var(--muted); background: none; border: none; outline: none;
+  cursor: default;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.send-btn {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: default;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; opacity: .5;
+}
+.send-btn svg { width: 12px; height: 12px; }
+
+/* ─── Responsive ────────────────────────────── */
+@media (max-width: 900px) {
+  .row { flex-direction: column; }
+  .row-fixed > :first-child, .row-fixed > :last-child { flex: 1; }
+}
+@media (max-width: 600px) {
+  .topbar { padding: 0 16px; }
+  .hero { padding: 12px 16px; }
+  .main { padding: 16px; }
+  .brand-sub { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ───────────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 16 16" fill="none">
+        <path d="M2 8C2 4.686 4.686 2 8 2s6 2.686 6 6-2.686 6-6 6-6-2.686-6-6z" stroke="white" stroke-width="1.5"/>
+        <path d="M5.5 8h5M8 5.5v5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">LoRA Research</div>
+      <div class="brand-sub">Qwen2.5-1.5B-Instruct</div>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('results')">Results</button>
+    <button class="tab" onclick="switchTab('curves')">Training Curves</button>
+    <button class="tab" onclick="switchTab('content')">Content Analysis</button>
+    <button class="tab" onclick="switchTab('outputs')">Output Viewer</button>
+    <button class="tab" onclick="switchTab('compare')">Before / After</button>
+  </nav>
+  <div class="topbar-right" id="exp-meta"></div>
+</header>
+
+<!-- ── Hero KPIs ─────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="kpi highlight">
+    <div class="kpi-label">Best Compliance</div>
+    <div class="kpi-value" id="kpi-compliance">—</div>
+    <div class="kpi-name"  id="kpi-compliance-name">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Best Val Loss</div>
+    <div class="kpi-value" id="kpi-val">—</div>
+    <div class="kpi-name"  id="kpi-val-name">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Most Efficient</div>
+    <div class="kpi-value" id="kpi-eff">—</div>
+    <div class="kpi-name"  id="kpi-eff-name">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Base Compliance</div>
+    <div class="kpi-value" id="kpi-base">—</div>
+    <div class="kpi-name">before fine-tuning</div>
+  </div>
+</section>
+
+<!-- ── Main content ───────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Results panel -->
+  <div id="panel-results" class="panel active">
+    <div class="row">
+      <div class="card">
+        <div class="card-hd">
+          <div>
+            <div class="card-title">Format Compliance</div>
+            <div class="card-desc">% of outputs passing all 4 template checks</div>
+          </div>
+        </div>
+        <div class="chart-wrap h240"><canvas id="c-compliance"></canvas></div>
+        <div class="legend" id="lg-compliance"></div>
+      </div>
+      <div class="card">
+        <div class="card-hd">
+          <div>
+            <div class="card-title">Final Loss</div>
+            <div class="card-desc">Train vs validation loss at end of training</div>
+          </div>
+        </div>
+        <div class="chart-wrap h240"><canvas id="c-loss"></canvas></div>
+        <div class="legend" id="lg-loss"></div>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="leaderboard">
+        <thead>
+          <tr>
+            <th>Experiment</th>
+            <th>LoRA R</th>
+            <th>Learning Rate</th>
+            <th>Epochs</th>
+            <th>Train Loss</th>
+            <th>Val Loss</th>
+            <th>Compliance</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Curves panel -->
+  <div id="panel-curves" class="panel">
+    <div class="row">
+      <div class="card">
+        <div class="card-hd">
+          <div>
+            <div class="card-title">Training Loss</div>
+            <div class="card-desc">Loss on training set over epochs</div>
+          </div>
+        </div>
+        <div class="chart-wrap h300"><canvas id="c-train"></canvas></div>
+        <div class="legend" id="lg-train"></div>
+      </div>
+      <div class="card">
+        <div class="card-hd">
+          <div>
+            <div class="card-title">Validation Loss</div>
+            <div class="card-desc">Loss on held-out set after each epoch</div>
+          </div>
+        </div>
+        <div class="chart-wrap h300"><canvas id="c-val"></canvas></div>
+        <div class="legend" id="lg-val"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content panel -->
+  <div id="panel-content" class="panel">
+    <div id="content-empty" class="empty" style="display:none">
+      <strong>Content analysis not yet generated</strong>
+      Run eval_content.py first, then regenerate the dashboard.
+      <code>python src/eval_content.py</code>
+    </div>
+    <div id="content-charts" class="panel active" style="gap:16px">
+      <div class="row">
+        <div class="card">
+          <div class="card-hd">
+            <div>
+              <div class="card-title">Multi-Metric Radar</div>
+              <div class="card-desc">Normalised across words, diversity, specificity, detail, question validity</div>
+            </div>
+          </div>
+          <div class="chart-wrap h300"><canvas id="c-radar"></canvas></div>
+          <div class="legend" id="lg-radar"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd">
+            <div>
+              <div class="card-title">Avg Words per Key Point</div>
+              <div class="card-desc">Higher = more detailed bullet explanations</div>
+            </div>
+          </div>
+          <div class="chart-wrap h300"><canvas id="c-ptwords"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd">
+          <div>
+            <div class="card-title">Output Specificity</div>
+            <div class="card-desc">Content tokens ÷ total tokens — higher means denser, less filler</div>
+          </div>
+        </div>
+        <div class="chart-wrap h240"><canvas id="c-specif"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outputs panel -->
+  <div id="panel-outputs" class="panel">
+    <div id="outputs-empty" class="empty" style="display:none">
+      <strong>Content outputs not yet generated</strong>
+      Run eval_content.py first, then regenerate the dashboard.
+      <code>python src/eval_content.py</code>
+    </div>
+    <div id="outputs-ui">
+      <div class="card" style="padding:16px 20px">
+        <div class="viewer-ctrl">
+          <span class="viewer-lbl">Prompt</span>
+          <select id="prompt-sel" onchange="renderOutputs()">
+            <option value="">Select a test prompt…</option>
+          </select>
+        </div>
+      </div>
+      <div class="prompt-quote" id="prompt-txt"></div>
+      <div class="out-grid" id="out-grid"></div>
+    </div>
+  </div>
+
+  <!-- Before / After panel -->
+  <div id="panel-compare" class="panel">
+    <div id="compare-empty" class="empty" style="display:none">
+      <strong>Content outputs not yet generated</strong>
+      Run eval_content.py first, then regenerate the dashboard.
+      <code>python src/eval_content.py</code>
+    </div>
+    <div id="compare-ui">
+      <div class="compare-ctrl">
+        <span class="viewer-lbl">Prompt</span>
+        <select id="compare-sel" onchange="renderCompare()">
+          <option value="">Select a test prompt…</option>
+        </select>
+      </div>
+      <div class="chat-cols" id="chat-cols"></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const DASH = {"experimentNames": ["baseline", "epochs_5", "lr_1e-4", "lr_5e-4", "qlora_4bit", "rank_32", "rank_64", "rank_8"], "colors": {"baseline": "#6366f1", "epochs_5": "#8b5cf6", "lr_1e-4": "#06b6d4", "lr_5e-4": "#f97316", "qlora_4bit": "#8b5cf6", "rank_32": "#10b981", "rank_64": "#ef4444", "rank_8": "#f59e0b", "base": "#94a3b8"}, "summary": {"best_compliance": {"name": "lr_5e-4", "value": "100%"}, "best_val_loss": {"name": "rank_64", "value": "1.4224"}, "most_efficient": {"name": "lr_5e-4", "value": "r=16"}}, "compliance": {"base": {"pass": 0, "n": 11, "pct": 0, "section_scores": {"summary": 1, "key_points": 1, "three_bullets": 5, "limitation": 1, "follow_up": 1}}, "baseline": {"pass": 10, "n": 11, "pct": 91, "section_scores": {"summary": 11, "key_points": 11, "three_bullets": 10, "limitation": 11, "follow_up": 11}}, "epochs_5": {"pass": 10, "n": 11, "pct": 91, "section_scores": {"summary": 11, "key_points": 11, "three_bullets": 10, "limitation": 11, "follow_up": 11}}, "lr_1e-4": {"pass": 8, "n": 11, "pct": 73, "section_scores": {"summary": 11, "key_points": 11, "three_bullets": 8, "limitation": 11, "follow_up": 11}}, "lr_5e-4": {"pass": 11, "n": 11, "pct": 100, "section_scores": {"summary": 11, "key_points": 11, "three_bullets": 11, "limitation": 11, "follow_up": 11}}, "qlora_4bit": {"pass": 10, "n": 11, "pct": 91, "section_scores": {"summary": 11, "key_points": 11, "three_bullets": 10, "limitation": 11, "follow_up": 11}}, "rank_32": {"pass": 9, "n": 11, "pct": 82, "section_scores": {"summary": 11, "key_points": 11, "three_bullets": 9, "limitation": 11, "follow_up": 11}}, "rank_64": {"pass": 10, "n": 11, "pct": 91, "section_scores": {"summary": 11, "key_points": 11, "three_bullets": 10, "limitation": 11, "follow_up": 11}}, "rank_8": {"pass": 6, "n": 11, "pct": 55, "section_scores": {"summary": 11, "key_points": 11, "three_bullets": 6, "limitation": 11, "follow_up": 11}}}, "experiments": {"baseline": {"meta": {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "lora_r": 16, "lora_alpha": 32, "lora_dropout": 0.05, "max_seq_len": 512, "batch_size": 2, "grad_acc": 8, "epochs": 3, "device": "mps", "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"], "learning_rate": 0.0002, "val_split": 0.1, "train_examples": 61, "val_examples": 7}, "trainCurve": [{"x": 1.258, "y": 2.4209}, {"x": 2.516, "y": 1.747}], "valCurve": [{"x": 1.0, "y": 2.0518}, {"x": 2.0, "y": 1.6761}, {"x": 3.0, "y": 1.5891}], "finalTrainLoss": 1.747, "finalValLoss": 1.5891}, "epochs_5": {"meta": {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "lora_r": 16, "lora_alpha": 32, "lora_dropout": 0.05, "max_seq_len": 512, "batch_size": 2, "grad_acc": 8, "epochs": 5, "device": "mps", "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"], "learning_rate": 0.0002, "val_split": 0.1, "train_examples": 61, "val_examples": 7}, "trainCurve": [{"x": 1.258, "y": 2.4174}, {"x": 2.516, "y": 1.6686}, {"x": 3.774, "y": 1.4014}, {"x": 5.0, "y": 1.3594}], "valCurve": [{"x": 1.0, "y": 2.042}, {"x": 2.0, "y": 1.5696}, {"x": 3.0, "y": 1.4513}, {"x": 4.0, "y": 1.4368}, {"x": 5.0, "y": 1.4345}], "finalTrainLoss": 1.3594, "finalValLoss": 1.4345}, "lr_1e-4": {"meta": {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "lora_r": 16, "lora_alpha": 32, "lora_dropout": 0.05, "max_seq_len": 512, "batch_size": 2, "grad_acc": 8, "epochs": 3, "device": "mps", "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"], "learning_rate": 0.0001, "val_split": 0.1, "train_examples": 61, "val_examples": 7}, "trainCurve": [{"x": 1.258, "y": 2.5067}, {"x": 2.516, "y": 2.0573}], "valCurve": [{"x": 1.0, "y": 2.2457}, {"x": 2.0, "y": 1.9974}, {"x": 3.0, "y": 1.9391}], "finalTrainLoss": 2.0573, "finalValLoss": 1.9391}, "lr_5e-4": {"meta": {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "lora_r": 16, "lora_alpha": 32, "lora_dropout": 0.05, "max_seq_len": 512, "batch_size": 2, "grad_acc": 8, "epochs": 3, "device": "mps", "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"], "learning_rate": 0.0005, "val_split": 0.1, "train_examples": 61, "val_examples": 7}, "trainCurve": [{"x": 1.258, "y": 2.2946}, {"x": 2.516, "y": 1.4132}], "valCurve": [{"x": 1.0, "y": 1.7648}, {"x": 2.0, "y": 1.4486}, {"x": 3.0, "y": 1.4368}], "finalTrainLoss": 1.4132, "finalValLoss": 1.4368}, "qlora_4bit": {"meta": {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "lora_r": 16, "lora_alpha": 32, "lora_dropout": 0.05, "max_seq_len": 512, "batch_size": 2, "grad_acc": 8, "epochs": 3, "device": "mps", "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"], "learning_rate": 0.0002, "val_split": 0.1, "train_examples": 61, "val_examples": 7, "use_qlora": true, "bnb_bits": 8}, "trainCurve": [{"x": 1.258, "y": 2.4273}, {"x": 2.516, "y": 1.7531}], "valCurve": [{"x": 1.0, "y": 2.0513}, {"x": 2.0, "y": 1.6847}, {"x": 3.0, "y": 1.5964}], "finalTrainLoss": 1.7531, "finalValLoss": 1.5964}, "rank_32": {"meta": {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "lora_r": 32, "lora_alpha": 64, "lora_dropout": 0.05, "max_seq_len": 512, "batch_size": 2, "grad_acc": 8, "epochs": 3, "device": "mps", "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"], "learning_rate": 0.0002, "val_split": 0.1, "train_examples": 61, "val_examples": 7}, "trainCurve": [{"x": 1.258, "y": 2.3323}, {"x": 2.516, "y": 1.4949}], "valCurve": [{"x": 1.0, "y": 1.8647}, {"x": 2.0, "y": 1.4767}, {"x": 3.0, "y": 1.4506}], "finalTrainLoss": 1.4949, "finalValLoss": 1.4506}, "rank_64": {"meta": {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "lora_r": 64, "lora_alpha": 128, "lora_dropout": 0.05, "max_seq_len": 512, "batch_size": 2, "grad_acc": 8, "epochs": 3, "device": "mps", "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"], "learning_rate": 0.0002, "val_split": 0.1, "train_examples": 61, "val_examples": 7}, "trainCurve": [{"x": 1.258, "y": 2.2447}, {"x": 2.516, "y": 1.3309}], "valCurve": [{"x": 1.0, "y": 1.6612}, {"x": 2.0, "y": 1.4285}, {"x": 3.0, "y": 1.4224}], "finalTrainLoss": 1.3309, "finalValLoss": 1.4224}, "rank_8": {"meta": {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "lora_r": 8, "lora_alpha": 16, "lora_dropout": 0.05, "max_seq_len": 512, "batch_size": 2, "grad_acc": 8, "epochs": 3, "device": "mps", "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"], "learning_rate": 0.0002, "val_split": 0.1, "train_examples": 61, "val_examples": 7}, "trainCurve": [{"x": 1.258, "y": 2.4984}, {"x": 2.516, "y": 2.0143}], "valCurve": [{"x": 1.0, "y": 2.2221}, {"x": 2.0, "y": 1.9488}, {"x": 3.0, "y": 1.8735}], "finalTrainLoss": 2.0143, "finalValLoss": 1.8735}}, "contentMetrics": {"base": {"total_words": 103.364, "lexical_diversity": 0.751, "specificity": 0.751, "summary_words": 99.182, "n_bullets": 3.545, "avg_point_words": 9.609, "limitation_words": 36.636, "followup_words": 15.909, "followup_is_q": 1.0}, "baseline": {"total_words": 77.818, "lexical_diversity": 0.834, "specificity": 0.802, "summary_words": 14.182, "n_bullets": 3.091, "avg_point_words": 9.927, "limitation_words": 12.545, "followup_words": 11.0, "followup_is_q": 1.0}, "epochs_5": {"total_words": 104.909, "lexical_diversity": 0.83, "specificity": 0.795, "summary_words": 19.182, "n_bullets": 3.091, "avg_point_words": 12.518, "limitation_words": 19.909, "followup_words": 15.273, "followup_is_q": 1.0}, "lr_1e-4": {"total_words": 74.0, "lexical_diversity": 0.806, "specificity": 0.75, "summary_words": 14.455, "n_bullets": 2.727, "avg_point_words": 9.636, "limitation_words": 12.818, "followup_words": 11.636, "followup_is_q": 1.0}, "lr_5e-4": {"total_words": 101.0, "lexical_diversity": 0.827, "specificity": 0.792, "summary_words": 18.545, "n_bullets": 3.0, "avg_point_words": 13.255, "limitation_words": 18.182, "followup_words": 13.909, "followup_is_q": 1.0}, "qlora_4bit": {"total_words": 80.364, "lexical_diversity": 0.842, "specificity": 0.783, "summary_words": 15.182, "n_bullets": 3.091, "avg_point_words": 10.418, "limitation_words": 13.727, "followup_words": 9.909, "followup_is_q": 1.0}, "rank_32": {"total_words": 100.455, "lexical_diversity": 0.825, "specificity": 0.796, "summary_words": 20.0, "n_bullets": 3.0, "avg_point_words": 12.327, "limitation_words": 18.545, "followup_words": 14.091, "followup_is_q": 1.0}, "rank_64": {"total_words": 96.545, "lexical_diversity": 0.831, "specificity": 0.79, "summary_words": 16.636, "n_bullets": 3.091, "avg_point_words": 11.5, "limitation_words": 18.636, "followup_words": 14.636, "followup_is_q": 1.0}, "rank_8": {"total_words": 73.818, "lexical_diversity": 0.832, "specificity": 0.764, "summary_words": 13.727, "n_bullets": 2.727, "avg_point_words": 9.818, "limitation_words": 11.909, "followup_words": 11.818, "followup_is_q": 1.0}}, "outputs": {"base": ["**Summary:**\nThe softmax function transforms a vector of real-valued scores into probabilities that sum to one.\n\n**Key Points:**\n- Converts real-valued scores into probabilities.\n- Used in multi-class classification.\n- Inside attention mechanisms for model understanding.\n\n**Limitation:**\n- Sensitive to the scale of input data; requires careful scaling.\n\n**Follow-Up Question:**\nHow can we ensure robustness when using softmax with very large input values?", "### Summary:\nByT5 operates on raw bytes without using subword tokenization, addressing biases introduced by tokenizers while handling diverse input types such as text and code.\n\n### Key Points:\n- **Operates Directly on Raw Bytes**: ByT5 processes data without relying on subword tokenization.\n- **Eliminates Tokenizer Biases**: This approach removes biases associated with traditional tokenization methods.\n- **Handles Multilingual Text and Code Uniformly**: ByT5 can process various forms of input including text and code.\n- **Longer Sequence Lengths**: The lack of subword tokenization results in longer sequences compared to tokenized models.\n\n### Limitation:\nThe primary limitation is that ByT5 may require larger memory and computational resources due to its inability to leverage efficient subword representations for better performance.\n\n### Follow-Up Question:\nHow might researchers address the limitations of ByT5 by leveraging more advanced techniques or architectures?", "### Summary:\nEmpirical Risk Minimization (ERM) is a fundamental approach in machine learning where models are selected based on minimizing the expected error over all possible data points. Structural Risk Minimization (SRM), an extension of ERM, incorporates a penalty term for model complexity to prevent overfitting.\n\n### Key Points:\n1. **Empirical Risk Minimization**: Selects hypotheses that minimize the average loss on the training set.\n2. **Structural Risk Minimization**: Adds a complexity penalty to balance fit and model complexity.\n\n### Limitation:\nWhile SRM addresses overfitting through complexity control, it may not always lead to optimal generalization if the chosen penalty does not accurately reflect the true difficulty of the problem.\n\n### Follow-Up Question:\nHow can we effectively determine the appropriate complexity penalty in structural risk minimization?", "### Summary:\nA causal language model is trained on code to generate and evaluate programs based on their functionality.\n\n### Key Points:\n- **Training Data**: CodeX and StarCoder datasets.\n- **Model Type**: Causal Language Model.\n- **Evaluation Metric**: Fraction of generated code passing unit tests for functional correctness.\n\n### Limitation:\nThe evaluation metric may not fully capture all aspects of program quality beyond just functional correctness.\n\n### Follow-Up Question:\nHow can we improve the evaluation metric to better assess other qualities such as performance efficiency or readability?", "Summary:\nAdapter modules are used to enable modular, lightweight multi-task adaptation by inserting small feed-forward bottleneck layers between transformer sub-layers.\n\nKey Points:\n- Adapter modules insert small feed-forward bottleneck layers.\n- They are placed between transformer sub-layers.\n- Only adapter weights are trained during fine-tuning.\n- Pretrained backbone is kept frozen.\n- Enables modular and lightweight multi-task adaptation.\n\nLimitation:\nThe training of only adapter weights can lead to limited flexibility compared to full model retraining.\n\nFollow-up Question:\nHow does the use of adapter modules affect the computational efficiency and performance of the model?", "### Summary:\nCurriculum Learning trains models sequentially by presenting them with progressively more complex tasks, hypothesizing that simpler initial exposures provide beneficial inductive biases leading to better performance on harder problems.\n\n### Key Points:\n- **Sequential Training**: Models learn tasks in an order from easier to harder.\n- **Inductive Biases**: Early exposure helps establish useful inductive biases.\n- **Improved Convergence**: Helps models converge faster and better on challenging tasks.\n\n### Limitation:\nThe effectiveness of curriculum learning can vary depending on task complexity and model architecture.\n\n### Follow-Up Question:\nHow might incorporating adaptive difficulty levels within each task affect the efficiency and accuracy of curriculum learning?", "### Summary:\nT5 reinterprets various natural language processing (NLP) tasks such as translation, summarization, classification, and question answering by framing them as text-to-text problems.\n\n### Key Points:\n- T5 uses an encoder-decoder architecture.\n- It employs the span denoising loss function for all tasks.\n- The model is trained on diverse datasets including Wikipedia articles and web pages.\n- Tasks like translation, summarization, classification, and QA can be handled with minimal changes to the model's structure.\n\n### Limitation:\nThe approach may not generalize well to new domains outside of those covered by the pre-trained dataset.\n\n### Follow-Up Question:\nHow might T5 be adapted to improve its performance on less common or specialized NLP tasks?", "### Summary:\nMonte Carlo Tree Search (MCTS) is an algorithm that combines tree search and random simulation to estimate the value of game states.\n\n### Key Points:\n- **Combination**: MCTS integrates tree search with random simulation.\n- **Estimation**: It estimates the value of game states through simulations.\n- **Selection**: Uses the Upper Confidence Bound (UCB) formula for selecting moves.\n- **Application**: Primarily used in AlphaGo for playing Go games.\n\n### Limitation:\nThe main limitation of MCTS lies in its reliance on randomness, which can lead to suboptimal decisions if not carefully managed.\n\n### Follow-Up Question:\nHow might one address the limitations of MCTS related to randomness to improve its performance?", "**Summary:**\nReLU activation function has become the standard for many deep learning models, particularly in transformer architectures.\n\n**Key Points:**\n- **ReLU's Dominance:** It is widely used due to its simplicity and effectiveness.\n- **Vanishing Gradients Problem:** Resisted by alternatives like GELU and SiLU.\n- **Transformer Applications:** Commonly seen in transformer-based models.\n\n**Limitation:**\n- The dominance of ReLU can lead to issues with gradient flow during training.\n\n**Follow-Up Question:**\n- How might alternative activation functions impact model performance in specific tasks?", "### Summary:\nOptimal transport theory is used to measure the distance between two probability distributions by minimizing cost functions that describe how to transform one distribution into another.\n\n### Key Points:\n- **Distance Measurement**: Optimal transport measures the minimum cost required to transform one probability distribution into another.\n- **Applications**: Applied to generative modeling, domain adaptation, and signal alignment in language models.\n- **Cost Functions**: Described transformations using cost functions that quantify the effort needed to move mass from one distribution to another.\n\n### Limitation:\nThe primary limitation of optimal transport lies in its computational complexity, which can be prohibitive for large-scale applications due to the need to solve linear programs.\n\n### Follow-Up Question:\nHow can techniques like sampling-based methods or approximations improve the efficiency of solving the optimization problem in optimal transport?", "**Summary:**\nParameter-efficient fine-tuning methods like Low-Rank Adaptation (LoRA) reduce the computational and memory costs associated with traditional model adaptation by injecting small trainable matrices into selected layers.\n\n**Key Points:**\n- **Low-Rank Adaptation (LoRA):** Avoids updating full model parameters by injecting small matrices.\n- **Rank Hyperparameter:** Determines the size of these matrices; affects both efficiency and expressiveness.\n- **Modular Design:** Allows swapping LoRA adapters for different tasks without retraining the entire model.\n- **Trade-offs:** Includes efficiency vs. expressiveness, and potential issues like underfitting or instability.\n\n**Limitation:**\nChoosing the right rank in LoRA involves balancing computational efficiency against model capability, potentially leading to suboptimal results if the task deviates significantly from the initial training distribution.\n\n**Follow-Up Question:**\nHow does the choice of rank in LoRA impact the generalization capabilities of the model across diverse datasets?"], "baseline": ["Summary:\nThe softmax function maps logits to probabilities.\n\nKey Points:\n- The output has elements that sum to one.\n- Negative numbers can be mapped to positive ones using an exponential transformation.\n- Softmax is applied element-wise across the input dimensions.\n\nLimitation:\nSoftmax does not preserve relative order between inputs; it only orders them according to their magnitude.\n\nFollow-up Question:\nDoes applying softmax to negative numbers result in correct ordering?", "Summary:\nByT5 operates directly on raw byte sequences without tokenization.\n\nKey Points:\n- Byte-level processing avoids subtoken bias.\n- Supports any language with no character encoding conversion.\n- Longer sequences due to lack of subtokens.\n\nLimitation:\nByte-level model outputs cannot be decoded back into text.\n\nFollow-up Question:\nHow does byte-level output affect downstream tasks?", "Summary:\nEmpirical risk minimization chooses hypotheses with low expected error; structural risk minimization adds a penalty for complexity.\n\nKey Points:\n- The bias-variance tradeoff is inherent in empirical risk minimization.\n- Complexity penalties can prevent overfitting and improve generalization.\n- Regularized models have lower test error than unregularized ones.\n\nLimitation:\nRegularization often requires tuning hyperparameters like λ (the regularization parameter).\n\nFollow-up Question:\nHow does the choice of λ affect the trade-off between bias and variance?", "Summary:\nA causal language model trained on code learns to generate correct programs by predicting subsequent tokens conditioned on context.\n\nKey Points:\n- The model is fine-tuned with human-written test cases.\n- Code completion accuracy correlates with downstream performance on real-world benchmarks.\n- Pre-trained models generalize well across different programming languages and domains.\n\nLimitation:\nThe dataset used for training may not fully capture all possible variations in code generation.\n\nFollow-up Question:\nCan we improve the quality of generated code by incorporating domain-specific knowledge during pre-training?", "Summary:\nAdapter modules insert small feed-forward bottleneck layers between transformer sub-layers to enable modular, lightweight multi-task adaptation.\n\nKey Points:\n- Adapter weights are only trained during fine-tuning.\n- Pretrained backbone is kept frozen for efficiency.\n- Can be applied across multiple tasks without retraining backbone.\n\nLimitation:\nTraining requires careful initialization of adapter weights.\n\nFollow-up Question:\nHow can we ensure stable training with large initializations?", "Summary:\nCurriculum learning orders training data by difficulty and uses progressively harder tasks to train models.\n\nKey Points:\n- Early examples provide strong initial inductive bias.\n- Harder examples refine weak initial hypotheses.\n- Curriculum learning can accelerate generalization beyond standard training.\n\nLimitation:\nCurriculum learning may not generalize well if it does not capture all relevant prior knowledge.\n\nFollow-up Question:\nHow do we design effective curriculum schedules?", "Summary:\nT5 treats all NLP tasks as text-to-text generation with shared encoder-decoder architecture.\n\nKey Points:\n- T5 uses span denoising loss for all tasks.\n- Prefixes specify task type; e.g., \"translate\" for translation.\n- Encoder is masked out during decoding to prevent direct access to source tokens.\n\nLimitation:\nNo explicit attention mechanism prevents overfitting on any single task.\n\nFollow-up Question:\nHow does T5's multi-task learning generalize to unseen downstream tasks?", "Summary:\nMonte Carlo Tree Search balances exploration and exploitation through simulations and backpropagation.\n\nKey Points:\n- It is an iterative algorithm that builds a search tree.\n- The root node represents the current state, while leaf nodes represent terminal states.\n- Nodes along the path from root to leaf store statistics about their visit count and reward.\n- The UCB formula guides selection: higher values indicate more promising paths.\n\nLimitation:\nIt can be slow for large games due to repeated simulations.\n\nFollow-up Question:\nHow does incorporating lookahead improve MCTS's efficiency?", "Summary:\nReLU introduces linearity at zero input but quickly becomes nonlinear for positive inputs; variants mitigate issues with dead neurons.\n\nKey Points:\n- ReLU's linear behavior below zero is mitigated by negative slope.\n- Negative slopes prevent exploding gradients during backpropagation.\n- Variants like Leaky ReLU and Parametric ReLU (PReLU) add a small slope above zero.\n\nLimitation:\nNegative slopes can cause \"dead neurons\" where activations remain constant.\n\nFollow-up Question:\nAre there better alternatives to negative slopes that avoid dead neurons?", "Summary:\nOptimal transport measures the cost of transporting mass from one distribution to another.\n\nKey Points:\n- The Kantorovich-Wasserstein metric is defined as the infimum over all couplings of the expected squared Wasserstein distance.\n- Optimal transport can be computed using Sinkhorn iterations on the dual problem.\n- Domain adaptation with optimal transport involves learning an equivariant map that aligns source and target distributions.\n\nLimitation:\nThe curse of dimensionality makes exact computation in high dimensions impractical; approximate methods like Sinkhorn-Knopp scaling are used instead.\n\nFollow-up Question:\nCan we leverage neural networks to learn efficient approximations of optimal transport maps?", "Summary:\nLow-Rank Adaptation (LoRA) efficiently adapts pre-trained models to new tasks by injecting low-rank matrices into selected layers.\n\nKey Points:\n- LoRA reduces the number of trainable parameters by freezing most of the model.\n- The rank of the injected matrices controls their expressive power and computational cost.\n- Modularity allows swapping LoRA adapters for different tasks without retraining the entire model.\n\nLimitation:\nChoosing the right rank is crucial; too high leads to overfitting, while too low limits expressiveness.\n\nFollow-up Question:\nHow does LoRA compare to other parameter-efficient techniques like LORA or QKQ, and what are their respective strengths and weaknesses?"], "epochs_5": ["Summary:\nSoftmax maps logits to probabilities that sum to one, useful for ranking and classification.\n\nKey Points:\n- The output has elements between 0 and 1, with higher values corresponding to more likely classes.\n- The derivative is numerically stable compared to other activation functions like ReLU.\n- Softmax can be applied element-wise across multiple vectors simultaneously.\n\nLimitation:\nSoftmax does not preserve relative order; if two inputs have identical logit values, their softmax outputs will be equal.\n\nFollow-up Question:\nDoes applying softmax before or after normalization (softmax(x) - max(softmax(x))) improve performance on certain tasks?", "Summary:\nByT5 processes byte-level input without tokenization, enabling direct handling of arbitrary text and code.\n\nKey Points:\n- Byte-level processing allows uniform encoding of multilingual content.\n- Longer sequences result from skipping over padding symbols; no explicit truncation is needed.\n- The model's architecture adapts to varying input length by adjusting its attention mechanism.\n\nLimitation:\nByte-level inputs can be more challenging for downstream tasks that require fine-grained control over word boundaries.\n\nFollow-up Question:\nDoes byte-level input preserve semantic information as effectively as tokenized input across all NLP tasks?", "Summary:\nEmpirical risk minimization chooses hypotheses with low expected loss over all possible distributions of data; structural risk minimization adds a penalty for model complexity.\n\nKey Points:\n- The bias-variance tradeoff is central: minimizing empirical error (bias) while avoiding overfitting requires balancing variance.\n- Regularization terms like L2 weight decay penalize large weights directly and implicitly regularize models.\n- Empirical risk minimization can be seen as an unconstrained optimization problem, whereas structural risk minimization introduces constraints via penalties.\n\nLimitation:\nStructural risk minimization often underfits compared to empirical risk minimization when the true function has high VC dimension but small sample size.\n\nFollow-up Question:\nDoes incorporating regularization during training rather than post-hoc improve generalization beyond what empirical risk minimization alone achieves?", "Summary:\nCodeX and StarCoder use causal language models trained on code to generate high-quality programs that pass unit tests.\n\nKey Points:\n- The Causal Language Model is fine-tuned with human-written test cases.\n- CodeX achieves state-of-the-art performance on both completion and generation tasks.\n- StarCoder outperforms other methods by generating more accurate and diverse code.\n\nLimitation:\nThe success depends heavily on the quality and quantity of training data; poor initial prompts can lead to garbage-in-garbage-out behavior.\n\nFollow-up Question:\nDo different types of code (e.g., imperative vs. object-oriented) benefit from causal language modeling differently?", "Summary:\nAdapter modules insert small FFN layers after each transformer layer to enable flexible task-specific weight updates without freezing the entire model.\n\nKey Points:\n- Adapter weights are only updated during fine-tuning, allowing them to be optimized for specific tasks.\n- The pre-trained backbone remains unchanged, preserving its performance on downstream tasks.\n- Adapter modules can be applied to any architecture with standard attention blocks, making it easy to add new capabilities.\n\nLimitation:\nThe effectiveness of adapters depends on their ability to capture relevant knowledge from the original training data; if the task is too dissimilar, they may not generalize well.\n\nFollow-up Question:\nDo different types of adapters (e.g., position-wise vs. feed-forward) have distinct advantages across various downstream tasks?", "Summary:\nCurriculum learning orders training data by difficulty, providing earlier experience with simpler tasks which improves generalization.\n\nKey Points:\n- Early-stage models learn more robust features than late-stage ones.\n- Curriculum learning can reduce overfitting and accelerate convergence.\n- It works well for both supervised and reinforcement learning.\n\nLimitation:\nThe order of difficulty must be carefully chosen; if too many easy examples precede hard ones, it may not help at all.\n\nFollow-up Question:\nDoes curriculum learning work better when the task space is continuous rather than discrete?", "Summary:\nT5 treats all NLP tasks as text-to-text generation problems with shared encoder-decoder architectures and span-denoising objectives.\n\nKey Points:\n- T5's shared architecture allows it to perform multiple downstream tasks without fine-tuning.\n- The prefix in the input indicates which task is being performed; e.g., \"summarize\" for summarization.\n- T5 achieves state-of-the-art performance on various benchmarks by leveraging its universal model capacity.\n\nLimitation:\nThe fixed-length prefix makes T5 unsuitable for long-form text generation where context length varies significantly.\n\nFollow-up Question:\nDoes T5 benefit from longer prefixes that better capture global context?", "Summary:\nMCTS balances tree search and random sampling to efficiently explore game trees, selecting promising moves that balance expected reward against computational cost.\n\nKey Points:\n- The root node is expanded until it contains at least one leaf.\n- Randomly select child nodes according to their estimated quality based on UCB values.\n- Repeat for multiple iterations, updating the node's score after each rollout.\n- Prune long-tail paths early to focus on more promising regions of the tree.\n\nLimitation:\nThe UCB factor can overestimate the quality of low-scoring but highly visited nodes, leading to suboptimal play if not corrected.\n\nFollow-up Question:\nDoes incorporating lookahead depth into the UCB formula improve MCTS performance without significantly increasing computation time?", "Summary:\nReLU is the most widely used activation function; alternatives like GELU and SiLU offer improved numerical stability.\n\nKey Points:\n- ReLU's linear behavior around zero makes it computationally efficient.\n- GELU combines linearity at zero with smoothness for better numerical properties.\n- SiLU (Swish) balances linearity and smoothness between positive and negative inputs.\n\nLimitation:\nGELU and SiLU can be numerically unstable when applied to very small input values near zero.\n\nFollow-up Question:\nDo alternative activations like Mish or FastSwish provide further improvements over GELU/SiLU?", "Summary:\nOptimal transport provides a principled way to measure dissimilarity between probability distributions, with applications across machine learning.\n\nKey Points:\n- The Wasserstein metric is optimal under smooth cost functions.\n- Sinkhorn-Knopp algorithm efficiently computes approximate solutions to the OT problem.\n- OT-based methods can align data from different domains without explicit supervision.\n\nLimitation:\nOT requires solving an NP-hard optimization problem; exact computation scales exponentially with dimensionality.\n\nFollow-up Question:\nDoes OT's ability to handle non-smooth costs (e.g., KL divergence) enable more robust transfer learning?", "Summary:\nLow-Rank Adaptation (LoRA) efficiently adapts pre-trained models to new tasks by injecting small, low-rank matrices into selected layers, reducing the number of trainable parameters while retaining most of the model's expressive power.\n\nKey Points:\n- LoRA achieves up to 90% reduction in parameter count compared to full fine-tuning.\n- The rank parameter controls the trade-off between expressivity and computational cost; higher ranks require more memory but allow capturing richer task-specific behaviors.\n- Modularity allows swapping LoRA adapters for different tasks without retraining the entire model, making it suitable for dynamic task-switching scenarios.\n\nLimitation:\nThe effectiveness of LoRA depends on the similarity between the target task and the original training distribution. Poorly aligned tasks may benefit less from LoRA than full fine-tuning.\n\nFollow-up Question:\nDoes LoRA consistently outperform full fine-tuning across a wide range of tasks, or does it show strong performance only in specific domains?"], "lr_1e-4": ["Summary:\nThe softmax function maps logits to probabilities.\n\nKey Points:\n- The output of the softmax function is always between 0 and 1.\n- The sum of the outputs of the softmax function equals 1.\n\nLimitation:\nSoftmax can only be applied to vectors with one-hot encoded labels.\n\nFollow-up Question:\nWhat happens if we apply softmax to a vector with more than one label?", "Summary:\nByT5 operates directly on raw bytes without tokenization.\n\nKey Points:\n- ByT5 processes entire sequences as byte-level data.\n- It can handle multilingual text and code uniformly.\n- Longer sequences result from not using subword tokens.\n\nLimitation:\nThe lack of subword tokenization introduces potential bias due to character-level patterns.\n\nFollow-up Question:\nHow does the absence of subword tokenization affect model performance compared to traditional transformer architectures?", "Summary:\nEmpirical risk minimization (ERM) chooses hypotheses with low expected error; structural risk minimization (SRM) adds a penalty for model complexity.\n\nKey Points:\n- ERM selects hypotheses minimizing expected loss.\n- SRM balances fit and complexity via an added penalty term.\n\nLimitation:\nSRM can overfit if the penalty is too strong.\n\nFollow-up Question:\nHow does SRM's trade-off between fit and complexity affect generalization?", "Summary:\nA causal language model trained on code is evaluated using human-generated test cases.\n\nKey Points:\n- The model learns to generate correct code by predicting missing parts.\n- CodeX and StarCoder datasets were used for training.\n- Unit testing accuracy serves as an evaluation metric.\n\nLimitation:\nThe dataset may not fully capture all possible edge cases.\n\nFollow-up Question:\nHow can we improve the model's ability to handle rare errors?", "Summary:\nAdapter modules insert small feed-forward bottleneck layers between transformer sub-layers to enable modular, lightweight multi-task adaptation.\n\nKey Points:\n- Adapter modules insert small feed-forward bottleneck layers between transformer sub-layers.\n- Only adapter weights are trained during fine-tuning, while pretrained backbone is kept frozen.\n- This enables modular, lightweight multi-task adaptation.\n\nLimitation:\nThe training of adapter weights requires significant computational resources due to their small size.\n\nFollow-up Question:\nHow can we optimize the training process for faster convergence?", "Summary:\nCurriculum learning orders training data by difficulty and uses it to train models.\n\nKey Points:\n- Early examples provide useful inductive biases.\n- This improves performance on harder tasks.\n\nLimitation:\nThe order of examples may not be optimal for all tasks.\n\nFollow-up Question:\nWhat other strategies can be used to optimize example ordering?", "Summary:\nT5 reinterprets various NLP tasks as text-to-text problems.\n\nKey Points:\n- T5 uses an encoder-decoder model with span denoising loss.\n- Prefixes specify the task: translation, summarization, classification, QA.\n- Task-specific parameters learned for each task.\n\nLimitation:\nNo clear generalization to other domains beyond NLP.\n\nFollow-up Question:\nCan T5 be applied to non-NLP tasks?", "Summary:\nMonte Carlo Tree Search is an algorithm that uses both Monte Carlo methods and tree search techniques to select optimal actions in games.\n\nKey Points:\n- It balances exploitation and exploration through the UCB formula.\n- The algorithm simulates many game outcomes to estimate state values.\n- MCTS has been applied to various domains including Go, chess, and Atari games.\n\nLimitation:\nThe performance can be sensitive to hyperparameters like the number of simulations and the threshold for pruning.\n\nFollow-up Question:\nHow does the choice of initial policy affect the convergence speed of MCTS?", "Summary:\nReLU is the most popular activation function used in deep learning.\n\nKey Points:\n- ReLU introduces nonlinearity by setting negative inputs to zero.\n- It has been widely adopted because of its simplicity and effectiveness in preventing vanishing gradients.\n- Variants like GELU and SiLU have gained popularity for their improved performance on certain tasks.\n\nLimitation:\nThe lack of explicit gradient information during backpropagation can lead to unstable training dynamics.\n\nFollow-up Question:\nAre there any other activation functions that could be more effective than ReLU?", "Summary:\nOptimal transport theory provides a framework for measuring the dissimilarity between two probability distributions.\n\nKey Points:\n- Optimal transport can be used as an objective function in machine learning.\n- The Wasserstein metric is commonly used in optimal transport.\n- The Sinkhorn algorithm efficiently computes the optimal transport map.\n\nLimitation:\nThe computational complexity of computing the optimal transport map grows quadratically with respect to the number of samples.\n\nFollow-up Question:\nHow can we approximate the optimal transport map more efficiently?", "Summary: Parameter-efficient fine-tuning methods like Low-Rank Adaptation (LoRA) reduce the number of trainable parameters by injecting small matrices into selected layers, enabling faster and more efficient training.\n\nKey Points:\n- LoRA reduces computational costs and memory usage compared to full fine-tuning.\n- The rank parameter controls the size of the injected matrices, balancing efficiency and expressiveness.\n- Modularity allows swapping LoRA adapters for different tasks without retraining the entire model.\n\nLimitation: Choosing an optimal rank requires careful consideration due to the trade-offs between computational efficiency and model expressiveness.\n\nFollow-up Question: How does LoRA compare to other parameter-efficient techniques such as Knowledge Distillation or Pruned Networks?"], "lr_5e-4": ["Summary:\nSoftmax maps logits to probabilities that sum to one, useful for ranking and classification.\n\nKey Points:\n- The output has elements between zero and one.\n- Each class gets its own row in the matrix representation.\n- The gradient is numerically stable compared to other activation functions.\n\nLimitation:\nSoftmax can't handle negative input values; applying an absolute value before softmax avoids this issue but adds complexity.\n\nFollow-up Question:\nDoes using temperature scaling (softmax(temperature * x)) improve performance on tasks like image captioning where exact probabilities aren't crucial?", "Summary:\nByT5 processes byte-level input without tokenization, enabling direct handling of multilingual text and code.\n\nKey Points:\n- Byte-level processing allows uniform encoding across languages and scripts.\n- Longer sequences result from no padding; truncation is necessary for inference.\n- The model's ability to handle arbitrary inputs makes it suitable for diverse applications.\n\nLimitation:\nByte-level representation can be less compact than tokenized representations, potentially requiring more memory.\n\nFollow-up Question:\nDoes byte-level context consistently outperform tokenized context in downstream tasks?", "Summary:\nEmpirical risk minimization (ERM) chooses hypothesis with lowest expected error over all possible data; structural risk minimization adds a regularization term to penalize overly complex models.\n\nKey Points:\n- ERM selects the hypothesis with minimum training error.\n- Regularized ERM balances bias and variance via an L2 norm penalty.\n- The VC dimension bounds the generalization gap between ERM and optimal solution.\n\nLimitation:\nRegularization can lead to underfitting if the penalty is too strong relative to the noise level.\n\nFollow-up Question:\nDoes incorporating cross-validation into regularized ERM improve generalization beyond simple validation set selection?", "Summary:\nCodeX and StarCoder Causal Pretraining trains LLMs to generate correct Python code by predicting follow-on tokens conditioned on partial input.\n\nKey Points:\n- The causal structure ensures that each token is predicted based only on its immediate context.\n- CodeX achieves state-of-the-art performance on both syntactic and semantic evaluation metrics.\n- StarCoder outperforms CodeX on syntactic tasks but falls behind on semantic ones due to limited training data.\n\nLimitation:\nThe lack of diverse real-world examples limits generalization beyond the specific task domain used for pretraining.\n\nFollow-up Question:\nDoes fine-tuning on more varied datasets improve the ability of these models to generalize across different programming languages?", "Summary:\nAdapter modules insert small FFN layers after each transformer block to enable flexible task-specific weight updates without freezing the entire model.\n\nKey Points:\n- Adapter weights are only updated for specific tasks, allowing them to be fine-tuned independently of the pre-trained backbone.\n- The small size (typically 4x4) makes it feasible to train on large models while still maintaining performance comparable to full-weighted adapters.\n- Adapters can be combined with other techniques like cross-attention heads to perform multiple tasks simultaneously.\n\nLimitation:\nAdapters require careful design to avoid overfitting to the training set; they must be carefully tuned to ensure that the learned weights generalize well across different tasks.\n\nFollow-up Question:\nDo adapter weights exhibit catastrophic forgetting when used as part of a multitask architecture?", "Summary:\nCurriculum learning orders training data by difficulty, providing gradual inductive bias and improving generalization.\n\nKey Points:\n- Early examples capture simpler concepts, reducing overfitting.\n- Harder tasks help fine-tune weak initial models without catastrophic forgetting.\n- Curriculum can be applied at multiple levels (task, architecture, hyperparameter).\n\nLimitation:\nThe optimal curriculum order depends on task complexity and prior knowledge.\n\nFollow-up Question:\nDoes curriculum learning consistently outperform random ordering across all domains?", "Summary:\nT5 treats all NLP tasks as text-to-text generation by reusing an encoder-decoder model trained on span denoising.\n\nKey Points:\n- T5's shared architecture allows fine-tuning with minimal adaptation.\n- The prefix determines which output slot to predict from the decoder.\n- T5 achieves state-of-the-art performance on multiple downstream NLP benchmarks.\n\nLimitation:\nThe fixed-length context window may limit generalization beyond the original dataset.\n\nFollow-up Question:\nDoes T5 benefit from longer context windows for out-of-distribution transfer learning?", "Summary:\nMCTS balances exploration and exploitation through node sampling and selection based on UCB estimates.\n\nKey Points:\n- It uses a replay buffer to store past simulations.\n- The root node is always expanded, while leaf nodes are pruned if they have been visited too few times.\n- The number of simulations per iteration scales linearly with the branching factor.\n\nLimitation:\nThe quality of the policy depends critically on the balance between exploration and exploitation; overly aggressive exploration can lead to suboptimal play.\n\nFollow-up Question:\nDoes incorporating lookahead information from future iterations improve MCTS's ability to find optimal strategies?", "Summary:\nReLU activation introduces linear regions between zero and positive values, allowing neurons to learn piecewise-linear decision boundaries.\n\nKey Points:\n- The gradient of ReLU is always positive for x > 0, preventing exploding gradients.\n- Swish combines ReLU with a smooth approximation of exp(x), improving performance on some tasks without additional parameters.\n- Mish combines ReLU with a hyperbolic tangent term, offering improved numerical stability over ReLU alone.\n\nLimitation:\nThe lack of negative slopes means that ReLU cannot represent all monotonic functions; it requires careful initialization or weight sharing strategies.\n\nFollow-up Question:\nDoes adding negative slope (e.g., Leaky ReLU) improve generalization beyond ReLU alone?", "Summary:\nOptimal transport provides a principled way to measure dissimilarity between probability distributions and align them through optimal transportation plans.\n\nKey Points:\n- The Wasserstein metric is the most common OT-based distance, defined as the cost of transporting mass from one distribution to match the other.\n- OT can be computed efficiently using Sinkhorn iterations on the dual problem's linear program.\n- OT has enabled new architectures like GANs that directly optimize against the Wasserstein distance.\n\nLimitation:\nOT requires knowledge of both input distributions, which may not always be available during inference.\n\nFollow-up Question:\nDoes OT-based regularization improve generalization beyond traditional adversarial training?", "Summary:\nLow-Rank Adaptation (LoRA) efficiently adapts pre-trained models to new tasks by injecting small trainable matrices into selected layers, reducing the number of parameters and enabling fast, memory-efficient fine-tuning.\n\nKey Points:\n- LoRA achieves up to 90x speedup over full fine-tuning on large models.\n- The rank parameter controls the sparsity of the injected matrices; higher ranks allow capturing more complex task-specific behaviors at the expense of increased computational cost.\n- Modularity allows swapping LoRA adapters for different tasks without retraining the entire model, making LoRA well-suited for dynamic task-switching scenarios.\n\nLimitation:\nWhile LoRA offers substantial performance gains, it does not always match the baseline performance of full fine-tuning across all tasks, especially those that differ substantially from the original training distribution.\n\nFollow-up Question:\nDoes LoRA consistently outperform full fine-tuning across a wide range of tasks, or do there exist specific domains where full fine-tuning remains superior?"], "qlora_4bit": ["Summary:\nThe softmax function maps logits to probabilities that sum to one.\n\nKey Points:\n- The output has elements between zero and one.\n- Each element's gradient is proportional to its input value.\n- Softmax can be computed efficiently using matrix operations.\n\nLimitation:\nSoftmax does not preserve relative order; it only ranks inputs.\n\nFollow-up Question:\nIs there an alternative activation function that preserves relative ordering?", "Summary:\nByT5 operates directly on raw byte sequences without tokenization.\n\nKey Points:\n- Byte-level processing avoids subtoken bias.\n- Supports any language with no dependency injection.\n- Longer sequences due to lack of subtokens.\n\nLimitation:\nByte-level model outputs cannot be decoded back into text.\n\nFollow-up Question:\nHow can we decode byte-level model outputs?", "Summary:\nEmpirical risk minimization chooses hypothesis with lowest expected error; structural risk minimization adds regularization to control overfitting.\n\nKey Points:\n- Empirical risk is the mean loss across all samples.\n- Complexity penalty encourages models to be simpler and generalize better.\n- Regularization can prevent overfitting but also reduces performance on unseen data.\n\nLimitation:\nStructural risk minimization may not always find optimal solutions due to bias-variance tradeoff.\n\nFollow-up Question:\nHow does incorporating prior knowledge about the problem domain affect the choice of regularization parameter?", "Summary:\nA causal language model trained on code learns to generate correct programs by predicting the next token conditioned on previous tokens and context.\n\nKey Points:\n- The model is fine-tuned on CodebaseQA QA pairs.\n- It generates high-quality code with fewer bugs than random guessing.\n- The model's performance improves as it sees more training examples from diverse domains.\n\nLimitation:\nThe dataset used for pre-training has limited diversity compared to real-world codebases.\n\nFollow-up Question:\nDoes the model generalize well to unseen programming languages?", "Summary:\nAdapter modules insert small bottleneck layers after each transformer layer to enable flexible task-specific weight updates without freezing the entire model.\n\nKey Points:\n- Adapter weights are only updated for specific tasks.\n- This allows training on multiple downstream tasks with minimal additional computational cost.\n- The architecture is highly efficient because it does not require retraining of the full model.\n\nLimitation:\nThe effectiveness of adapters depends critically on their ability to capture relevant knowledge from the pre-trained backbone.\n\nFollow-up Question:\nCan we design more effective adapter architectures that generalize better across different downstream tasks?", "Summary:\nCurriculum learning orders training data by difficulty and uses progressively more complex models.\n\nKey Points:\n- Early stages use simpler models with fewer parameters.\n- Models learn increasingly sophisticated representations as they encounter harder tasks.\n- Curriculum learning can accelerate generalization across diverse datasets.\n\nLimitation:\nThe effectiveness of curriculum learning depends critically on task ordering; poorly designed curricula may fail to exploit prior knowledge effectively.\n\nFollow-up Question:\nHow does curriculum learning interact with other regularization techniques like dropout?", "Summary:\nT5 treats all NLP tasks as text-to-text generation problems with shared architectures.\n\nKey Points:\n- T5 uses an encoder-decoder model trained on masked language modeling to generate coherent text.\n- The decoder predicts tokens conditioned on context from the previous token; the encoder maps inputs to fixed-length vectors.\n- Prefixes specify task: \"translate\" for translation, \"summarize\" for shortening text, etc.\n\nLimitation:\nThe model's ability to generalize between related but distinct domains is limited by its single-shot learning approach.\n\nFollow-up Question:\nDoes fine-tuning on specific downstream tasks improve generalization?", "Summary:\nMCTS balances exploration and exploitation through node sampling and selection based on UCB estimates.\n\nKey Points:\n- It uses Monte Carlo simulations to evaluate state values.\n- The root node is expanded until a terminal state is reached.\n- Nodes are sampled uniformly at each level; children are selected greedily according to UCB scores.\n- Exploration bias can be mitigated by limiting the number of samples per leaf.\n\nLimitation:\nExploration vs. exploitation tradeoff: MCTS often overestimates low-value states due to insufficient exploration.\n\nFollow-up Question:\nHow does incorporating lookahead depth affect MCTS's performance?", "Summary:\nReLU introduces linearity at zero input but quickly becomes nonlinear for positive inputs; variants mitigate saturation issues.\n\nKey Points:\n- ReLU's linear behavior below zero is mitigated by negative slope.\n- Leaky ReLU allows small positive values without dead neurons.\n- Swish combines ReLU with a smooth curve for better performance.\n\nLimitation:\nGradient explosion can occur if the gradient of ReLU exceeds 100%.\n\nFollow-up Question:\nDoes using maxout instead of ReLU improve generalization?", "Summary:\nOptimal transport measures the cost of transporting mass from one distribution to another.\n\nKey Points:\n- The Kantorovich-Wasserstein metric is used.\n- Wasserstein barycenters represent weighted averages of distributions.\n- Optimal transport can be computed efficiently using Sinkhorn iterations.\n\nLimitation:\nThe curse of dimensionality makes optimal transport expensive for high-dimensional data.\n\nFollow-up Question:\nCan approximate methods improve scalability?", "Summary:\nLow-Rank Adaptation (LoRA) efficiently adapts pre-trained models to new tasks by injecting low-rank matrices into selected layers.\n\nKey Points:\n- LoRA reduces the number of trainable parameters by replacing dense weight updates with matrix multiplications.\n- The rank of the injected matrices controls their expressive power; higher ranks allow capturing more complex features but require more memory.\n- Modularity allows swapping LoRA adapters for different tasks without retraining the entire model.\n\nLimitation:\nChoosing the right rank is crucial: too high leads to overfitting, while too low results in insufficient adaptation.\n\nFollow-up Question:\nHow does LoRA compare to other parameter-efficient techniques like Knowledge Distillation or Pruned Networks?"], "rank_32": ["Summary:\nThe softmax function maps logits to probabilities that sum to one, useful for converting raw scores into interpretable output.\n\nKey Points:\n- The exponential transformation ensures positive outputs.\n- Normalization prevents gradients from exploding during backpropagation.\n- Softmax can be applied element-wise across multiple vectors simultaneously.\n\nLimitation:\nSoftmax does not preserve relative order between elements; ties result in equal probabilities.\n\nFollow-up Question:\nDoes applying softmax before or after normalization yield better performance on certain tasks?", "Summary:\nByT5 processes byte sequences without tokenization, enabling direct handling of raw text and code.\n\nKey Points:\n- Byte-level processing bypasses character-level dependencies.\n- Raw byte sequences can be arbitrarily long without truncation issues.\n- Models learn to disentangle language from other content (e.g., emojis).\n\nLimitation:\nByte-level models lack fine-grained control over word boundaries compared to subword tokenizers.\n\nFollow-up Question:\nDo byte-level models generalize better across languages with vastly different writing systems?", "Summary:\nEmpirical risk minimization chooses hypothesis with lowest expected error over all possible data realizations; structural risk minimization adds a penalty for model complexity.\n\nKey Points:\n- The bias-variance tradeoff is inherent in both approaches.\n- Empirical risk can be high if the training distribution differs from test distribution (bias).\n- Complexity penalties prevent overfitting but may reduce generalizability (variance).\n\nLimitation:\nStructural risk minimization does not directly account for noise in the training data.\n\nFollow-up Question:\nDoes incorporating regularization terms proportional to the variance of the training labels improve generalization?", "Summary:\nCausal language models trained on code can generate high-quality programs by learning causal dependencies between tokens.\n\nKey Points:\n- The model learns to predict future tokens conditioned on past context.\n- CodeX and StarCoder achieve state-of-the-art performance on benchmark datasets like Hugging Face's GLUE.\n- Unit test coverage is used as a functional correctness metric for evaluation.\n\nLimitation:\nThe quality of generated code depends critically on the quality of the training data; noisy or incomplete examples lead to poor results.\n\nFollow-up Question:\nDo different types of code (e.g., imperative vs. object-oriented) benefit from causal conditioning differently?", "Summary:\nAdapter modules insert small FFN layers after each transformer layer to enable flexible task-specific weight updates without freezing the entire model.\n\nKey Points:\n- Adapter weights are only updated for specific tasks, allowing them to be finetuned independently of the pre-trained backbone.\n- The architecture is simple yet effective at adapting multiple downstream tasks with minimal additional parameters compared to full retraining.\n\nLimitation:\nThe effectiveness of adapters depends on their ability to capture relevant knowledge from the original training data; if the task-specific features are not well-aligned with the initial encoder's learned representations, performance may degrade.\n\nFollow-up Question:\nDo different types of adapter architectures (e.g., position-wise vs. feedforward) yield significantly different results across various downstream tasks?", "Summary:\nCurriculum learning orders training data by difficulty and trains models sequentially, hypothesizing that earlier stages capture simpler but more frequent patterns.\n\nKey Points:\n- Early layers learn basic features like edges and corners.\n- Later layers generalize these primitives to complex shapes.\n- Curriculum can be applied at multiple levels (e.g., architecture, hyperparameters).\n\nLimitation:\nThe effectiveness of curriculum depends critically on how well it captures task-specific structure; if not, it may fail to improve performance.\n\nFollow-up Question:\nDoes incorporating domain knowledge about task structure into curriculum design enhance its effectiveness?", "Summary:\nT5 treats all NLP tasks as text-to-text generation, reusing an encoder-decoder shared by translation, summarization, and QA.\n\nKey Points:\n- T5's span denoising loss encourages fluent output that avoids abrupt shifts between generations.\n- The shared encoder allows fine-tuning on any downstream task with minimal adaptation effort.\n- Prefix tokens specify the target task; T5 can switch from one to another without retraining.\n\nLimitation:\nThe fixed-length inputs of T5 may not capture long-range dependencies common in many NLP tasks.\n\nFollow-up Question:\nDoes T5's shared encoder allow it to generalize better than separate architectures for different tasks?", "Summary:\nMCTS balances tree search and random sampling to select optimal moves by estimating state values through simulations.\n\nKey Points:\n- It uses an MDP model to predict future rewards.\n- The root node is always expanded until it has children representing all possible next moves.\n- Each leaf node's score is updated based on its visit count and reward from subsequent simulations.\n- The parent node then selects the best child according to UCB: C + V/√N where C is current confidence, V is average reward, N is visits, and √N normalizes for variance.\n\nLimitation:\nExploration vs. exploitation tradeoff; often underestimates longer-term value due to short simulation depth.\n\nFollow-up Question:\nDoes incorporating lookahead beyond immediate successors improve MCTS performance?", "Summary:\nReLU introduces linear regions between activations, preventing exploding gradients; GELU and SiLU offer smooth approximations of ReLU with faster convergence.\n\nKey Points:\n- ReLU's linear region prevents gradient explosion but can cause dead neurons.\n- Swish combines ReLU's linearity with sigmoid's smoothness for better performance.\n- Transformer activation functions (e.g., LayerNorm followed by GELU) enable effective self-attention.\n\nLimitation:\nGELU and SiLU require careful initialization to avoid numerical instability at zero inputs.\n\nFollow-up Question:\nDo alternative activation functions consistently outperform ReLU across all tasks?", "Summary:\nOptimal transport quantifies the dissimilarity between two probability distributions as the cost of transporting mass from one to the other.\n\nKey Points:\n- The Kantorovich-Wasserstein metric is defined on any Polish space.\n- Sinkhorn's algorithm efficiently computes approximate solutions with provable convergence guarantees.\n- Transport maps can be used to align features across domains without explicit supervision.\n\nLimitation:\nThe curse of dimensionality makes OT expensive to compute even for moderate-sized datasets.\n\nFollow-up Question:\nCan attention mechanisms in transformers be viewed as optimal transport plans over token representations?", "Summary:\nLow-Rank Adaptation (LoRA) efficiently adapts pre-trained models to new tasks by injecting small, low-rank matrices into selected layers, reducing the number of trainable parameters while retaining most of the model's expressive power.\n\nKey Points:\n- LoRA achieves up to 90x speedup over full fine-tuning on downstream tasks.\n- The rank controls the tradeoff between expressivity and computational cost; higher ranks require more memory but allow capturing richer representations.\n- Modularity allows swapping LoRA adapters for different tasks without retraining the entire model, making it suitable for dynamic task-switching scenarios.\n\nLimitation:\nThe effectiveness of LoRA depends critically on the choice of rank; too high a rank can cause the model to underfit, while too low a rank might fail to fully exploit the knowledge learned during pre-training.\n\nFollow-up Question:\nDoes LoRA consistently improve upon full fine-tuning across a wide range of tasks, or does it perform best on specific types of tasks?"], "rank_64": ["Summary:\nSoftmax maps logits to probabilities that sum to one, useful for ranking and classification.\n\nKey Points:\n- The output is always between zero and one.\n- Each class has a unique maximum value.\n- The derivative is numerically stable compared to other normalization methods.\n\nLimitation:\nSoftmax can't handle negative input values directly; they must be shifted to positive infinity first.\n\nFollow-up Question:\nDoes applying a temperature parameter (softmax(x / t)) improve performance on tasks like image captioning?", "Summary:\nByT5 processes raw byte sequences without tokenization, enabling direct handling of multilingual text and code.\n\nKey Points:\n- Byte-level processing avoids bias from character-level tokenizers.\n- Longer input sequences result due to no truncation based on subword boundaries.\n- The model can be fine-tuned with any pre-trained weights for downstream tasks.\n\nLimitation:\nByte-level processing means that all characters must fit within each token, potentially limiting support for very long inputs.\n\nFollow-up Question:\nDoes byte-level processing introduce artifacts when fine-tuning on standard language-only data?", "Summary:\nEmpirical risk minimization chooses hypothesis with lowest expected error; structural risk minimization adds a penalty for model complexity.\n\nKey Points:\n- The bias-variance tradeoff is fundamental: low bias (empirical risk) leads to overfitting; high variance (structural risk) prevents it.\n- Regularization parameters control the tradeoff between fitting data and avoiding overfitting.\n- Empirical risk minimization can be seen as an unconstrained optimization problem, while structural risk minimization uses Lagrange multipliers.\n\nLimitation:\nRegularization often requires tuning hyperparameters, which can be unstable and prone to overfitting itself if not done carefully.\n\nFollow-up Question:\nDoes early stopping based on validation performance always outperform cross-validation when regularization is applied?", "Summary:\nCausal LLM pre-training with code data improves completion quality and functional correctness.\n\nKey Points:\n- CodeX and StarCoder datasets augment standard text-only LMs.\n- Completion accuracy is higher than random guessing but lower than full-length completions.\n- Functional correctness correlates strongly with test coverage; only ~50% of generated code passes all tests.\n\nLimitation:\nThe causal relationship between training data and downstream task performance may not generalize well across different tasks.\n\nFollow-up Question:\nDoes causal LLM pre-training consistently improve downstream task performance beyond what can be achieved by fine-tuning on the target task alone?", "Summary:\nAdapter modules insert small FFN layers after each transformer block to enable flexible task-specific fine-tuning without freezing the entire model.\n\nKey Points:\n- Adapter weights are only updated during fine-tuning, allowing them to be optimized for specific tasks.\n- The pre-trained backbone remains unchanged, preserving its performance on downstream tasks.\n- Adapter modules can be stacked across multiple transformer blocks, providing strong generalization capabilities.\n\nLimitation:\nThe effectiveness of adapters depends heavily on the choice of target task; they may not generalize well if the new task is very different from the training data.\n\nFollow-up Question:\nDo adapter modules consistently outperform full retraining on all types of downstream tasks?", "Summary:\nCurriculum learning orders training data by difficulty, providing initial inductive biases that aid generalization.\n\nKey Points:\n- Early examples capture simpler concepts, reducing overfitting.\n- Curriculum can be applied at multiple levels (task, architecture).\n- It outperforms random ordering and no curriculum in many tasks.\n\nLimitation:\nThe optimal order of examples depends on task complexity; human intuition may not always align with algorithmic best practices.\n\nFollow-up Question:\nDoes curriculum learning consistently outperform other regularization techniques across all domains?", "Summary:\nT5 reinterprets NLP tasks as span-level prediction problems with an encoder-decoder shared across all tasks.\n\nKey Points:\n- The same encoder-decoder is used for translation, summarization, and QA.\n- Prefixes specify the target output type: \"sum\" for summaries, \"cls\" for class labels, etc.\n- T5 achieves state-of-the-art performance on multiple benchmarks without fine-tuning.\n\nLimitation:\nThe fixed-length prefix structure limits flexibility to new tasks that don't fit within the span-based framework.\n\nFollow-up Question:\nDoes T5's shared architecture generalize well to out-of-domain tasks not originally trained on?", "Summary:\nMCTS balances tree search and random sampling to estimate game values efficiently.\n\nKey Points:\n- The root node is expanded uniformly at each iteration.\n- Random simulations from leaf nodes update the belief about the state's quality.\n- The UCB formula prioritizes exploration over exploitation based on estimated Q-values.\n\nLimitation:\nThe number of simulations required scales quadratically with depth, making it impractical for deep games like Go.\n\nFollow-up Question:\nDoes incorporating lookahead pruning improve MCTS performance beyond simple UCB selection?", "Summary:\nReLU activation introduces linearity followed by saturation at zero, making it simple yet effective for many tasks.\n\nKey Points:\n- ReLU's linear behavior allows fast backpropagation through hidden layers.\n- The hard thresholding of ReLU prevents exploding gradients during training.\n- Variants like Leaky ReLU and Swish offer slight improvements over pure ReLU without additional parameters.\n\nLimitation:\nReLU is not differentiable at zero, which can cause numerical instability in some contexts (e.g., when computing derivatives).\n\nFollow-up Question:\nDo gradient clipping techniques consistently improve performance on all tasks compared to using ReLU activations?", "Summary:\nOptimal transport quantifies the dissimilarity between probability distributions as the cost of transporting one to the other.\n\nKey Points:\n- The Kantorovich-Wasserstein metric is the most common OT formulation.\n- OT can be computed efficiently using Sinkhorn iterations on dual variables.\n- OT-based methods have improved GAN performance and data augmentation strategies.\n\nLimitation:\nOT requires knowledge of both input and target distributions, which may not always be available during inference.\n\nFollow-up Question:\nDoes OT-based contrastive learning (e.g., MoCo) outperform vanilla contrastive loss when only one distribution is known?", "Summary:\nLow-Rank Adaptation (LoRA) efficiently adapts pretrained language models to new tasks by injecting small trainable matrices into selected layers, reducing the number of parameters and enabling fast, memory-efficient fine-tuning.\n\nKey Points:\n- LoRA replaces full weight updates with matrix injections that preserve the base model structure.\n- The rank of the injected matrices controls the expressive capacity; lower ranks reduce computation at the cost of flexibility.\n- Multiple LoRA adapters can be combined to adapt to diverse tasks without retraining the entire model.\n- Proper tuning of LoRA parameters is crucial to avoid overfitting or instability during training.\n\nLimitation:\nWhile LoRA offers substantial speedups compared to full fine-tuning, it does not always match the performance of full fine-tuning on every task.\n\nFollow-up Question:\nDoes LoRA consistently improve downstream performance across a wide range of NLP tasks, or do some tasks benefit more than others?"], "rank_8": ["Summary:\nThe softmax function maps logits to probabilities.\n\nKey Points:\n- The output of the softmax function is always between 0 and 1.\n- The sum of the outputs of the softmax function equals 1.\n\nLimitation:\nSoftmax can only be applied to vectors with one-hot encoded labels.\n\nFollow-up Question:\nWhat happens if we apply softmax to a vector that has more than two classes?", "Summary:\nByT5 operates directly on raw bytes without tokenization.\n\nKey Points:\n- ByT5 can handle arbitrary multilingual text and code.\n- It has longer sequence lengths compared to tokenized models.\n\nLimitation:\nIt lacks the ability for downstream tasks that require fine-grained control over word order.\n\nFollow-up Question:\nHow does ByT5's byte-level approach compare to other approaches in terms of performance?", "Summary:\nEmpirical risk minimization (ERM) chooses hypotheses with low expected error; structural risk minimization (SRM) adds a penalty for complexity.\n\nKey Points:\n- ERM selects hypotheses minimizing expected loss.\n- SRM balances fit and complexity via an added term proportional to the VC dimension of the hypothesis class.\n\nLimitation:\nSRM can overfit if the penalty is too large relative to the variance.\n\nFollow-up Question:\nHow does SRM's tradeoff between fit and complexity vary across different types of data?", "Summary:\nA causal language model trained on code learns to generate correct programs by predicting missing parts.\n\nKey Points:\n- The model is fine-tuned with human-written test cases.\n- CodeX and StarCoder achieve state-of-the-art performance on various benchmarks.\n- Unit testing accuracy correlates well with other metrics like BLEU score.\n\nLimitation:\nThe dataset used for training may not be representative of all possible inputs.\n\nFollow-up Question:\nCan we improve the model's ability to handle edge cases?", "Summary:\nAdapter modules insert small bottleneck layers between transformer sub-layers to enable modular, lightweight multi-task adaptation.\n\nKey Points:\n- Adapter modules insert small bottleneck layers between transformer sub-layers.\n- Only adapter weights are trained during fine-tuning.\n- Pretrained backbone is kept frozen for efficiency.\n\nLimitation:\nTraining requires careful initialization of adapter weights.\n\nFollow-up Question:\nHow can we ensure that the adapter module does not overfit on the task-specific features?", "Summary:\nCurriculum learning orders training data by difficulty and uses it to train models.\n\nKey Points:\n- Early examples provide useful inductive biases.\n- Training order improves generalization performance.\n\nLimitation:\nTraining order may not generalize well across domains.\n\nFollow-up Question:\nHow can we automatically generate curriculum orders?", "Summary:\nT5 reinterprets various NLP tasks as text-to-text problems.\n\nKey Points:\n- T5 uses an encoder-decoder model with span denoising loss.\n- Prefixes specify task type: translate, summarize, classify, answer questions.\n- Task-specific parameters enable generalizable models.\n\nLimitation:\nTask-specific parameters limit modularity; shared weights hinder fine-tuning.\n\nFollow-up Question:\nHow can we generalize T5 to other domains without losing its strengths?", "Summary:\nMonte Carlo Tree Search is an algorithm that uses both Monte Carlo methods and tree search to select optimal actions.\n\nKey Points:\n- It balances exploitation and exploration.\n- The UCB formula guides selection based on estimated state values.\n- MCTS has been applied to various games including Go.\n\nLimitation:\nThe performance can be sensitive to hyperparameters like the number of simulations and rollout depth.\n\nFollow-up Question:\nHow does the choice of parameters affect the quality of MCTS's results?", "Summary:\nReLU is the most popular activation function used in modern deep learning models.\n\nKey Points:\n- ReLU introduces nonlinearity by setting negative inputs to zero.\n- It has been shown to be more effective than sigmoid and tanh at approximating arbitrary functions.\n- Variants of ReLU such as Leaky ReLU, Parametric ReLU (PReLU), and SELU have improved performance on certain tasks.\n- The use of ReLU leads to faster convergence during training compared to other activation functions.\n\nLimitation:\nThe lack of monotonicity in ReLU can lead to unstable gradient descent dynamics, especially for very large input values.\n\nFollow-up Question:\nAre there any alternative activation functions that offer better stability and/or performance?", "Summary:\nOptimal transport measures the cost of transporting mass from one distribution to another.\n\nKey Points:\n- Optimal transport is defined as minimizing the expected cost of moving masses.\n- The Wasserstein metric quantifies optimal transport using the Earth Mover's Distance (EMD).\n- EMD can be computed efficiently with linear programming techniques.\n\nLimitation:\nThe computational complexity of computing exact solutions scales quadratically with input size.\n\nFollow-up Question:\nCan approximate algorithms improve scalability?", "Summary: Parameter-efficient fine-tuning methods like Low-Rank Adaptation reduce the number of trainable parameters by injecting small matrices into selected layers.\n\nKey Points:\n- LoRA reduces computational costs and memory usage compared to full fine-tuning.\n- The rank of the injected matrices controls their expressive power and computational complexity.\n- Modularity allows swapping LoRA adapters for different tasks without retraining the entire model.\n\nLimitation: Choosing an optimal rank balance between efficiency and performance is non-trivial.\n\nFollow-up Question: How does LoRA compare to other parameter-efficient techniques such as Knowledge Distillation or Pruned Networks?"]}, "prompts": [{"id": "test_01", "input": "The softmax function converts a vector of real-valued scores into a probability distribution by exponentiating each element and normalizing by the sum of all exponentiated values. It is used as the final layer in multi-class classifiers and inside attention mechanisms."}, {"id": "test_02", "input": "Tokenization-free models like ByT5 operate directly on raw bytes rather than subword tokens. This eliminates tokenizer-induced biases and handles arbitrary multilingual text and code uniformly, at the cost of longer sequence lengths."}, {"id": "test_03", "input": "The empirical risk minimization principle says learning algorithms should choose hypotheses that minimize the average loss on the training set. Structural risk minimization extends this by adding a complexity penalty to balance fit against model complexity."}, {"id": "test_04", "input": "Causal language model pre-training on code (CodeX, StarCoder) teaches a model to complete program prefixes. Evaluation on HumanEval measures the fraction of generated code samples that pass unit tests, providing a functional correctness metric."}, {"id": "test_05", "input": "Adapter modules are small feed-forward bottleneck layers inserted between transformer sub-layers. Only adapter weights are trained during fine-tuning, keeping the pretrained backbone frozen and enabling modular, lightweight multi-task adaptation."}, {"id": "test_06", "input": "Curriculum learning trains a model on examples ordered from easy to hard, mimicking the way humans are taught. The hypothesis is that early exposure to simple patterns provides useful inductive biases that improve convergence on difficult examples later."}, {"id": "test_07", "input": "T5 reframes all NLP tasks as text-to-text problems, using the same encoder-decoder architecture and training objective (span denoising) across translation, summarization, classification, and question answering. A prefix in the input specifies the task."}, {"id": "test_08", "input": "Monte Carlo Tree Search (MCTS) combines tree search with random simulation to estimate the value of game states. Used in AlphaGo, MCTS selects moves by balancing exploitation of high-value nodes with exploration of less-visited branches using the UCB formula."}, {"id": "test_09", "input": "Activation functions introduce nonlinearity into neural networks, enabling them to approximate arbitrary functions. ReLU replaced sigmoid and tanh as the dominant choice due to its simplicity and resistance to vanishing gradients, while variants like GELU and SiLU are now common in transformers."}, {"id": "test_10", "input": "Optimal transport theory measures the distance between two probability distributions by finding the minimum-cost plan for transforming one distribution into another. It has been applied to generative modeling, domain adaptation, and training signal alignment in language models."}, {"id": "test_11", "input": "In modern machine learning systems, model performance is not only determined by architecture and training data, but also by how effectively models are adapted to specific tasks. Fine-tuning has traditionally been the dominant approach, where all model parameters are updated using task-specific data. While effective, this method is computationally expensive and often requires significant memory resources, especially for large-scale models with billions of parameters. To address these challenges, parameter-efficient fine-tuning methods have been introduced. One prominent technique is Low-Rank Adaptation (LoRA), which avoids updating the full set of model weights. Instead, it injects small trainable matrices into certain layers of the model, allowing it to learn task-specific behavior while keeping the original weights frozen. This significantly reduces the number of trainable parameters and enables faster, more memory-efficient training. An important hyperparameter in LoRA is the rank, which determines the capacity of these injected matrices. Lower ranks result in fewer parameters and lower computational cost but may limit the model's ability to capture complex patterns. Higher ranks increase expressiveness but also introduce additional overhead. Therefore, choosing an appropriate rank involves a trade-off between efficiency and performance. Another advantage of LoRA is modularity. Since the base model remains unchanged, multiple LoRA adapters can be trained for different tasks and swapped in and out as needed. This makes it particularly useful in production environments where models must handle a variety of tasks without retraining from scratch. Despite its benefits, LoRA is not a universal solution. In some cases, especially when the task differs significantly from the original training distribution, full fine-tuning may still yield better performance. Additionally, improper configuration of LoRA parameters can lead to underfitting or unstable training."}], "hasContent": true, "nExp": 8};
+
+// ── Utils ──────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function hex2rgba(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function fmt(v, dec=4) {
+  return v != null ? Number(v).toFixed(dec) : '—';
+}
+
+// ── Chart defaults ─────────────────────────────────────────────────
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size   = 12;
+Chart.defaults.color       = '#94a3b8';
+
+const GRID = { color: '#f1f5f9', drawBorder: false };
+const TICK = { color: '#94a3b8', font: { size: 11 } };
+
+// ── Tab switching ──────────────────────────────────────────────────
+const PANELS = ['results','curves','content','outputs','compare'];
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', PANELS[i]===name));
+  PANELS.forEach(p => $('panel-'+p).classList.toggle('active', p===name));
+}
+
+// ── Legend ─────────────────────────────────────────────────────────
+function makeLegend(id, items) {
+  $(id).innerHTML = items.map(it =>
+    `<span class="legend-item">
+       <span class="legend-dot" style="background:${it.c}"></span>
+       ${it.l}
+     </span>`).join('');
+}
+
+// ── KPIs ───────────────────────────────────────────────────────────
+function buildKPIs() {
+  const s = DASH.summary;
+  $('kpi-compliance').textContent      = s.best_compliance.value;
+  $('kpi-compliance-name').textContent = s.best_compliance.name;
+  $('kpi-val').textContent             = s.best_val_loss.value;
+  $('kpi-val-name').textContent        = s.best_val_loss.name;
+  $('kpi-eff').textContent             = s.most_efficient.value;
+  $('kpi-eff-name').textContent        = s.most_efficient.name;
+
+  const base = DASH.compliance['base'];
+  $('kpi-base').textContent = base ? base.pct + '%' : '—';
+  $('exp-meta').textContent = `${DASH.nExp} experiments`;
+}
+
+// ── Compliance bar chart ───────────────────────────────────────────
+function buildCompliance() {
+  const names  = DASH.experimentNames;
+  const comp   = DASH.compliance;
+  const colors = names.map(n => DASH.colors[n]);
+  const lora   = names.map(n => comp[n]?.pct ?? 0);
+  const base   = comp['base']?.pct ?? 0;
+
+  new Chart($('c-compliance'), {
+    type: 'bar',
+    data: {
+      labels: names,
+      datasets: [
+        {
+          label: 'LoRA',
+          data: lora,
+          backgroundColor: colors.map(c => hex2rgba(c, 0.85)),
+          borderColor: colors,
+          borderWidth: 1.5,
+          borderRadius: 5,
+          borderSkipped: false,
+        },
+        {
+          label: 'Base model',
+          data: names.map(() => base),
+          backgroundColor: hex2rgba('#94a3b8', 0.3),
+          borderColor: '#94a3b8',
+          borderWidth: 1.5,
+          borderRadius: 5,
+          borderSkipped: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.raw}%` } },
+      },
+      scales: {
+        x: { grid: GRID, ticks: TICK },
+        y: { grid: GRID, ticks: { ...TICK, callback: v => v+'%' }, max: 100, beginAtZero: true },
+      },
+    },
+  });
+
+  makeLegend('lg-compliance', [
+    { c: '#6366f1', l: 'LoRA (per experiment)' },
+    { c: '#94a3b8', l: 'Base model (no fine-tuning)' },
+  ]);
+}
+
+// ── Loss bar chart ─────────────────────────────────────────────────
+function buildLoss() {
+  const names = DASH.experimentNames;
+  const exps  = DASH.experiments;
+
+  new Chart($('c-loss'), {
+    type: 'bar',
+    data: {
+      labels: names,
+      datasets: [
+        {
+          label: 'Train loss',
+          data: names.map(n => exps[n]?.finalTrainLoss ?? null),
+          backgroundColor: hex2rgba('#6366f1', 0.7),
+          borderColor: '#6366f1',
+          borderWidth: 1.5, borderRadius: 5, borderSkipped: false,
+        },
+        {
+          label: 'Val loss',
+          data: names.map(n => exps[n]?.finalValLoss ?? null),
+          backgroundColor: hex2rgba('#10b981', 0.7),
+          borderColor: '#10b981',
+          borderWidth: 1.5, borderRadius: 5, borderSkipped: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${fmt(c.raw)}` } },
+      },
+      scales: {
+        x: { grid: GRID, ticks: TICK },
+        y: { grid: GRID, ticks: TICK, beginAtZero: false },
+      },
+    },
+  });
+
+  makeLegend('lg-loss', [
+    { c: '#6366f1', l: 'Train loss' },
+    { c: '#10b981', l: 'Val loss'   },
+  ]);
+}
+
+// ── Leaderboard table ──────────────────────────────────────────────
+function buildTable() {
+  const names = DASH.experimentNames;
+  const comp  = DASH.compliance;
+  const exps  = DASH.experiments;
+  const bestPct = Math.max(...names.map(n => comp[n]?.pct ?? 0));
+
+  const rows = names.map(n => {
+    const c   = comp[n] ?? {};
+    const e   = exps[n] ?? {};
+    const m   = e.meta ?? {};
+    const pct = c.pct ?? 0;
+    const col = DASH.colors[n];
+    const isBest = pct === bestPct && bestPct > 0;
+
+    return `<tr>
+      <td><span class="td-exp">
+        <span class="td-dot" style="background:${col}"></span>
+        ${n}
+      </span></td>
+      <td class="td-mono">${m.lora_r ?? '—'}</td>
+      <td class="td-mono">${m.learning_rate ? Number(m.learning_rate).toExponential(0) : '—'}</td>
+      <td class="td-mono">${m.epochs ?? '—'}</td>
+      <td class="td-mono">${fmt(e.finalTrainLoss)}</td>
+      <td class="td-mono">${fmt(e.finalValLoss)}</td>
+      <td>
+        <div class="bar-cell">
+          <span class="td-mono">${pct}%</span>
+          <div class="mini-bar">
+            <div class="mini-fill" style="width:${pct}%;background:${col}"></div>
+          </div>
+        </div>
+      </td>
+      <td>${isBest ? '<span class="badge-best">★ Best</span>' : ''}</td>
+    </tr>`;
+  });
+
+  $('tbl-body').innerHTML = rows.join('');
+}
+
+// ── Curve charts ───────────────────────────────────────────────────
+function buildCurve(id, lgId, key, yLabel) {
+  const names    = DASH.experimentNames;
+  const datasets = names.map(n => ({
+    label: n,
+    data:  DASH.experiments[n]?.[key] ?? [],
+    borderColor:     DASH.colors[n],
+    backgroundColor: hex2rgba(DASH.colors[n], 0.06),
+    borderWidth: 2, tension: 0.35,
+    pointRadius: 2.5, pointHoverRadius: 5,
+    fill: false,
+  }));
+
+  new Chart($(id), {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: c => ` ${c.dataset.label}: ${fmt(c.raw.y)}` }
+        },
+      },
+      scales: {
+        x: { type: 'linear', grid: GRID, ticks: TICK,
+              title: { display: true, text: 'Epoch', color: '#94a3b8', font: { size: 11 } } },
+        y: { grid: GRID, ticks: TICK,
+              title: { display: true, text: yLabel, color: '#94a3b8', font: { size: 11 } } },
+      },
+    },
+  });
+
+  makeLegend(lgId, names.map(n => ({ c: DASH.colors[n], l: n })));
+}
+
+// ── Radar chart ────────────────────────────────────────────────────
+function buildRadar() {
+  const cm    = DASH.contentMetrics;
+  const all   = ['base', ...DASH.experimentNames].filter(n => n in cm);
+  const KEYS  = ['total_words','lexical_diversity','specificity','avg_point_words','followup_is_q'];
+  const LBLS  = ['Total Words','Lex Diversity','Specificity','Pt Detail','FU Valid'];
+
+  const allVals = KEYS.map(k => all.map(n => cm[n]?.[k] ?? 0));
+  const mins    = allVals.map(v => Math.min(...v));
+  const maxs    = allVals.map(v => Math.max(...v));
+  const norm    = n => KEYS.map((k,i) => {
+    const range = maxs[i] - mins[i];
+    return range === 0 ? 0.5 : ((cm[n]?.[k] ?? 0) - mins[i]) / range;
+  });
+
+  const datasets = all.map(n => ({
+    label: n,
+    data:  norm(n),
+    borderColor:     DASH.colors[n] || '#94a3b8',
+    backgroundColor: hex2rgba(DASH.colors[n] || '#94a3b8', 0.07),
+    borderWidth: 1.5, pointRadius: 2.5,
+  }));
+
+  new Chart($('c-radar'), {
+    type: 'radar',
+    data: { labels: LBLS, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        r: {
+          min: 0, max: 1,
+          ticks: { display: false },
+          grid: { color: '#e2e8f0' },
+          pointLabels: { font: { size: 11 }, color: '#64748b' },
+        },
+      },
+    },
+  });
+
+  makeLegend('lg-radar', all.map(n => ({ c: DASH.colors[n] || '#94a3b8', l: n })));
+}
+
+// ── Horizontal bar ─────────────────────────────────────────────────
+function buildHBar(id, metricKey, label) {
+  const cm    = DASH.contentMetrics;
+  const names = ['base', ...DASH.experimentNames].filter(n => n in cm);
+  const data  = names.map(n => +(cm[n]?.[metricKey] ?? 0).toFixed(3));
+  const cols  = names.map(n => DASH.colors[n] || '#94a3b8');
+
+  new Chart($(id), {
+    type: 'bar',
+    data: {
+      labels: names,
+      datasets: [{
+        label,
+        data,
+        backgroundColor: cols.map(c => hex2rgba(c, 0.8)),
+        borderColor: cols,
+        borderWidth: 1.5, borderRadius: 5, borderSkipped: false,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+                  tooltip: { callbacks: { label: c => ` ${c.raw}` } } },
+      scales: {
+        x: { grid: GRID, ticks: TICK, beginAtZero: true },
+        y: { grid: { display: false }, ticks: { ...TICK, font: { family: "'JetBrains Mono', monospace", size: 11 } } },
+      },
+    },
+  });
+}
+
+// ── Output viewer ──────────────────────────────────────────────────
+function buildPromptDropdown() {
+  const sel = $('prompt-sel');
+  DASH.prompts.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = p.id + ' — ' + p.input.slice(0, 65) + (p.input.length > 65 ? '…' : '');
+    sel.appendChild(o);
+  });
+}
+
+function hlSections(text) {
+  return text
+    .replace(/(Summary:)/g,           '<span class="out-sec">$1</span>')
+    .replace(/(Key Points:)/g,        '<span class="out-sec">$1</span>')
+    .replace(/(Limitation:)/g,        '<span class="out-sec">$1</span>')
+    .replace(/(Follow-up Question:)/g,'<span class="out-sec">$1</span>');
+}
+
+function renderOutputs() {
+  const pid  = $('prompt-sel').value;
+  const grid = $('out-grid');
+  const ptxt = $('prompt-txt');
+  if (!pid) { grid.innerHTML = ''; ptxt.classList.remove('visible'); return; }
+
+  const p   = DASH.prompts.find(x => x.id === pid);
+  const idx = DASH.prompts.findIndex(x => x.id === pid);
+  ptxt.textContent = p?.input ?? '';
+  ptxt.classList.add('visible');
+
+  const all = ['base', ...DASH.experimentNames];
+  grid.innerHTML = all.map(name => {
+    const text  = DASH.outputs[name]?.[idx] ?? '(no output)';
+    const color = DASH.colors[name] || '#94a3b8';
+    return `<div class="out-card">
+      <div class="out-hd">
+        <span class="out-hd-dot" style="background:${color}"></span>
+        <span class="out-hd-name">${name}</span>
+      </div>
+      <div class="out-body">${hlSections(text)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Before / After chat comparison ────────────────────────────────
+function pickCompareModels() {
+  // Tier 0: base (no adaptation)
+  // Tier 1: lowest LoRA rank available → "low capacity" demo
+  // Tier 2: highest compliance / lowest val loss → "trained well" demo
+  const names = DASH.experimentNames;
+  if (!names.length) return ['base', 'base', 'base'];
+  const exps  = DASH.experiments;
+  const comp  = DASH.compliance;
+
+  // Prefer specific known names for clarity, fall back to data-driven picks
+  const PREFER_LOW  = ['rank_8', 'lr_1e-4'];
+  const PREFER_BEST = ['rank_64', 'epochs_5', 'rank_32', 'baseline'];
+
+  const lowPick  = PREFER_LOW.find(n  => names.includes(n))
+    || names.slice().sort((a,b) =>
+        (exps[a]?.meta?.lora_r ?? 999) - (exps[b]?.meta?.lora_r ?? 999))[0];
+
+  const bestPick = PREFER_BEST.find(n => names.includes(n))
+    || (() => {
+      // sort by compliance desc, then val loss asc
+      const byComp = names.filter(n => comp[n]).sort((a,b) => comp[b].pct - comp[a].pct);
+      if (byComp.length) return byComp[0];
+      return names.slice().sort((a,b) =>
+        (exps[a]?.finalValLoss ?? 9) - (exps[b]?.finalValLoss ?? 9))[0];
+    })();
+
+  return ['base', lowPick, bestPick];
+}
+
+function chatHlSections(text) {
+  return text
+    .replace(/(Summary:)/g,           '<span class="chat-sec">$1</span>')
+    .replace(/(Key Points:)/g,        '<span class="chat-sec">$1</span>')
+    .replace(/(Limitation:)/g,        '<span class="chat-sec">$1</span>')
+    .replace(/(Follow-up Question:)/g,'<span class="chat-sec">$1</span>');
+}
+
+function compBadge(name) {
+  const c = DASH.compliance[name];
+  if (!c) return '';
+  const col = c.pct >= 80 ? '#10b981' : c.pct >= 50 ? '#f59e0b' : '#ef4444';
+  const bg  = col + '18';
+  return `<span class="chat-badge" style="background:${bg};color:${col}">${c.pct}% compliant</span>`;
+}
+
+function modelLabel(name) {
+  if (name === 'base') return { title: 'No Adaptation', sub: 'Qwen2.5-1.5B-Instruct · base' };
+  const meta = DASH.experiments[name]?.meta || {};
+  const r    = meta.lora_r    ? `r=${meta.lora_r}`       : '';
+  const lr   = meta.learning_rate ? `lr=${meta.learning_rate.toExponential(0)}` : '';
+  const ep   = meta.epochs    ? `${meta.epochs} ep`      : '';
+  const sub  = [r, lr, ep].filter(Boolean).join(' · ');
+  return { title: name, sub };
+}
+
+function buildChatWin(name, promptText, outputText, tier) {
+  const color  = DASH.colors[name] || '#94a3b8';
+  const lbl    = modelLabel(name);
+  const badge  = compBadge(name);
+
+  const tierTitle = tier === 0 ? 'No Adaptation'
+                  : tier === 1 ? 'LoRA — Low Rank'
+                  :              'LoRA — High Rank';
+  const tierSub   = tier === 0 ? lbl.sub
+                  : `${lbl.sub}`;
+  const initials  = tier === 0 ? 'B'
+                  : tier === 1 ? 'Lo'
+                  :               'Hi';
+
+  const tierLabel = tier === 0 ? 'No Adaptation (Base)'
+                  : tier === 1 ? 'LoRA — low rank / low capacity'
+                  :              'LoRA — higher rank / trained';
+
+  return `<div class="chat-win">
+    <div class="chat-header">
+      <div class="chat-avatar" style="background:${color}">${initials}</div>
+      <div>
+        <div class="chat-model-name">${tierTitle}</div>
+        <div class="chat-model-sub">${tierSub}</div>
+      </div>
+      ${badge}
+    </div>
+    <div class="chat-messages">
+      <div class="chat-msg user">
+        <div class="msg-icon user-icon">
+          <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="7" cy="4.5" r="2.5" stroke="#94a3b8" stroke-width="1.2"/>
+            <path d="M2 12c0-2.761 2.239-5 5-5s5 2.239 5 5" stroke="#94a3b8" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="msg-bubble">${promptText}</div>
+      </div>
+      <div class="chat-msg assistant">
+        <div class="msg-icon" style="background:${color}20; color:${color}; font-size:9px; font-weight:700;">AI</div>
+        <div class="msg-bubble">${chatHlSections(outputText || '(no output generated)')}</div>
+      </div>
+    </div>
+    <div class="chat-footer">
+      <div class="chat-footer-input">Ask a follow-up…</div>
+      <div class="send-btn">
+        <svg viewBox="0 0 12 12" fill="none">
+          <path d="M1 6h10M7 2l4 4-4 4" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildCompareDropdown() {
+  const sel = $('compare-sel');
+  DASH.prompts.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = p.id + ' — ' + p.input.slice(0, 70) + (p.input.length > 70 ? '…' : '');
+    sel.appendChild(o);
+  });
+}
+
+function renderCompare() {
+  const pid  = $('compare-sel').value;
+  const cols = $('chat-cols');
+  if (!pid) { cols.innerHTML = ''; return; }
+
+  const p   = DASH.prompts.find(x => x.id === pid);
+  const idx = DASH.prompts.findIndex(x => x.id === pid);
+
+  const [baseKey, midKey, bestKey] = pickCompareModels();
+  const trio = [baseKey, midKey, bestKey];
+
+  cols.innerHTML = trio.map((name, tier) => {
+    const text = DASH.outputs[name]?.[idx] ?? '';
+    return buildChatWin(name, p.input, text, tier);
+  }).join('');
+}
+
+// ── Init ───────────────────────────────────────────────────────────
+(function init() {
+  buildKPIs();
+  buildCompliance();
+  buildLoss();
+  buildTable();
+  buildCurve('c-train', 'lg-train', 'trainCurve', 'Loss');
+  buildCurve('c-val',   'lg-val',   'valCurve',   'Loss');
+
+  const noMetrics = !DASH.hasContent || Object.keys(DASH.contentMetrics).length === 0;
+  const noOutputs = !DASH.hasContent || Object.keys(DASH.outputs).length === 0;
+
+  if (noMetrics) {
+    $('content-empty').style.display  = 'block';
+    $('content-charts').style.display = 'none';
+  } else {
+    buildRadar();
+    buildHBar('c-ptwords', 'avg_point_words', 'Avg words / key point');
+    buildHBar('c-specif',  'specificity',     'Specificity');
+  }
+
+  if (noOutputs) {
+    $('outputs-empty').style.display  = 'block';
+    $('outputs-ui').style.display     = 'none';
+    $('compare-empty').style.display  = 'block';
+    $('compare-ui').style.display     = 'none';
+  } else {
+    buildPromptDropdown();
+    buildCompareDropdown();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# ── Model weights (too large for GitHub) ─────────────────
+# Adapter weights & optimizer states — regenerate with:
+#   python src/run_experiments.py
+outputs/experiments/**/adapter_model.safetensors
+outputs/experiments/**/optimizer.pt
+outputs/experiments/**/checkpoint-*/
+outputs/lora_adapter/
+
+# ── Trainer binary artifacts ─────────────────────────────
+outputs/**/training_args.bin
+
+# ── Claude Code local settings ───────────────────────────
+.claude/
+
+# ── macOS ─────────────────────────────────────────────────
+.DS_Store
