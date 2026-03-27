@@ -19,3 +19,4 @@ outputs/**/training_args.bin
 
 # ── macOS ─────────────────────────────────────────────────
 .DS_Store
+.claude/
