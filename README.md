@@ -187,19 +187,27 @@ Follow-up Question:
 ```
 research_ass/
 ├── data/
-│   ├── dataset.jsonl        # 68 training examples
-│   └── test_prompts.jsonl   # 10 held-out prompts
+│   ├── dataset.jsonl              # 68 training examples
+│   └── test_prompts.jsonl         # 10 held-out prompts
 ├── src/
-│   ├── train_lora.py        # SFTTrainer entrypoint
-│   ├── infer.py             # Base vs LoRA inference comparison
-│   └── eval_template.py     # Format-adherence evaluator
+│   ├── train_lora.py              # SFTTrainer entrypoint
+│   ├── infer.py                   # Base vs LoRA inference comparison
+│   ├── eval_template.py           # Format-adherence evaluator
+│   ├── eval_content.py            # Lexical / specificity content metrics
+│   ├── run_experiments.py         # Hyperparameter sweep runner
+│   ├── dashboard.py               # Builds outputs/dashboard.html
+│   └── constants.py               # Shared paths and prompt constants
+├── assets/
+│   └── screenshots/               # Dashboard and comparison screenshots
 ├── outputs/
-│   ├── lora_adapter/        # Saved adapter weights
-│   ├── before_after.md      # Per-prompt base vs LoRA comparison
-│   ├── eval_results.md      # Format compliance scores
-│   ├── experiment_results.md
-│   ├── content_comparison.md
-│   └── content_metrics.md
+│   ├── lora_adapter/              # Saved adapter weights (gitignored)
+│   ├── experiments/               # Per-experiment adapter configs
+│   ├── before_after.md            # Per-prompt base vs LoRA comparison
+│   ├── experiment_results.md      # Compliance + loss sweep table
+│   ├── content_comparison.md      # Full output text per experiment
+│   ├── content_metrics.md         # Avg lexical diversity / specificity
+│   ├── content_outputs.json       # Raw outputs (machine-readable)
+│   └── dashboard.html             # Interactive results dashboard
 ├── requirements.txt
 └── README.md
 ```
@@ -325,7 +333,7 @@ Beyond format compliance, the radar chart compares lexical diversity, specificit
 
 **OOM / killed process** — Lower `MAX_SEQ_LEN` (try 256) and increase `GRAD_ACC`. Set `BATCH_SIZE=1`.
 
-`**NotImplementedError: mps`** — Add the fallback flag:
+**`NotImplementedError: mps`** — Add the fallback flag:
 
 ```bash
 PYTORCH_ENABLE_MPS_FALLBACK=1 python src/train_lora.py
@@ -346,7 +354,7 @@ PYTORCH_ENABLE_MPS_FALLBACK=1 python src/train_lora.py
 | LoRA r=64 or 5 epochs        | **100%**          |
 
 
-The base model's failure modes are: wrong bullet count (4–5 instead of 3), `###` markdown headers instead of plain `Header:`, and `**bold`** formatting. The LoRA adapter reliably fixes all three on unseen prompts.
+The base model's failure modes are: wrong bullet count (4–5 instead of 3), `###` markdown headers instead of plain `Header:`, and `**bold**` formatting. The LoRA adapter reliably fixes all three on unseen prompts.
 
 ---
 
