@@ -57,6 +57,7 @@ EXPERIMENTS: list[dict] = [
     {"name": "epochs_5",  "env": {"EPOCHS": "5"}},
     {"name": "lr_1e-4",   "env": {"LEARNING_RATE": "1e-4"}},
     {"name": "lr_5e-4",   "env": {"LEARNING_RATE": "5e-4"}},
+    {"name": "qlora_4bit", "env": {"USE_QLORA": "1", "BNB_BITS": "4"}},
 ]
 
 

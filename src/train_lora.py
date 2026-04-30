@@ -3,8 +3,8 @@ LoRA / QLoRA fine-tuning with TRL SFTTrainer on Apple Silicon (MPS) or CUDA.
 
 Override defaults with environment variables:
   MODEL_ID, MAX_SEQ_LEN, BATCH_SIZE, GRAD_ACC, EPOCHS, LORA_R,
-  LEARNING_RATE, OUTPUT_DIR, VAL_SPLIT,
-  USE_QLORA (0|1), BNB_BITS (4|8)
+  LEARNING_RATE, MAX_STEPS, OUTPUT_DIR, DATA_PATH, TRAIN_PATH, VAL_PATH, VAL_SPLIT,
+  REPORT_TO, RUN_NAME, USE_QLORA (0|1), BNB_BITS (4|8)
 
 QLoRA notes:
   - 4-bit NF4 quantization requires CUDA; falls back to 8-bit on MPS.
@@ -19,7 +19,7 @@ from pathlib import Path
 import torch
 from datasets import Dataset
 from peft import LoraConfig, TaskType
-from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTTrainer, SFTConfig
 
 from constants import SYSTEM_PROMPT
@@ -36,12 +36,18 @@ LORA_R = int(os.getenv("LORA_R", "16"))
 LORA_ALPHA = int(os.getenv("LORA_ALPHA", str(LORA_R * 2)))
 LORA_DROPOUT = float(os.getenv("LORA_DROPOUT", "0.05"))
 LEARNING_RATE = float(os.getenv("LEARNING_RATE", "2e-4"))
+MAX_STEPS     = int(os.getenv("MAX_STEPS", "-1"))
 VAL_SPLIT     = float(os.getenv("VAL_SPLIT", "0.1"))
 USE_QLORA     = os.getenv("USE_QLORA", "0") == "1"
 BNB_BITS      = int(os.getenv("BNB_BITS", "4"))   # 4 or 8
+REPORT_TO     = os.getenv("REPORT_TO", "none")
+RUN_NAME      = os.getenv("RUN_NAME")
 
-DATA_PATH = Path(__file__).parent.parent / "data" / "dataset.jsonl"
-_default_output = Path(__file__).parent.parent / "outputs" / "lora_adapter"
+ROOT = Path(__file__).parent.parent
+DATA_PATH = Path(os.getenv("DATA_PATH", str(ROOT / "data" / "dataset.jsonl")))
+TRAIN_PATH = Path(os.getenv("TRAIN_PATH")) if os.getenv("TRAIN_PATH") else None
+VAL_PATH = Path(os.getenv("VAL_PATH")) if os.getenv("VAL_PATH") else None
+_default_output = ROOT / "outputs" / "lora_adapter"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(_default_output)))
 
 
@@ -71,6 +77,46 @@ def format_chat(example: dict, tokenizer) -> dict:
         add_generation_prompt=False,
     )
     return {"text": text}
+
+
+def build_datasets(tokenizer) -> tuple[Dataset, Dataset, dict]:
+    """Load fixed split files when provided, otherwise split DATA_PATH locally."""
+    if (TRAIN_PATH is None) ^ (VAL_PATH is None):
+        raise ValueError("Set both TRAIN_PATH and VAL_PATH, or neither.")
+
+    if TRAIN_PATH and VAL_PATH:
+        train_raw = load_jsonl(TRAIN_PATH)
+        val_raw = load_jsonl(VAL_PATH)
+        split_meta = {
+            "split_mode": "explicit",
+            "data_path": None,
+            "train_path": str(TRAIN_PATH),
+            "val_path": str(VAL_PATH),
+            "val_split": None,
+        }
+    else:
+        raw = load_jsonl(DATA_PATH)
+        formatted = [format_chat(ex, tokenizer) for ex in raw]
+
+        random.seed(42)
+        indices = list(range(len(formatted)))
+        random.shuffle(indices)
+        n_val = max(1, round(len(indices) * VAL_SPLIT))
+        val_idx = set(indices[:n_val])
+        train_data = [formatted[i] for i in range(len(formatted)) if i not in val_idx]
+        val_data = [formatted[i] for i in range(len(formatted)) if i in val_idx]
+        split_meta = {
+            "split_mode": "random",
+            "data_path": str(DATA_PATH),
+            "train_path": None,
+            "val_path": None,
+            "val_split": VAL_SPLIT,
+        }
+        return Dataset.from_list(train_data), Dataset.from_list(val_data), split_meta
+
+    train_data = [format_chat(ex, tokenizer) for ex in train_raw]
+    val_data = [format_chat(ex, tokenizer) for ex in val_raw]
+    return Dataset.from_list(train_data), Dataset.from_list(val_data), split_meta
 
 
 def load_quantized_model(model_id: str, device: str, bits: int):
@@ -145,18 +191,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Dataset
     # ------------------------------------------------------------------
-    raw = load_jsonl(DATA_PATH)
-    formatted = [format_chat(ex, tokenizer) for ex in raw]
-
-    random.seed(42)
-    indices = list(range(len(formatted)))
-    random.shuffle(indices)
-    n_val = max(1, round(len(indices) * VAL_SPLIT))
-    val_idx = set(indices[:n_val])
-    train_data = [formatted[i] for i in range(len(formatted)) if i not in val_idx]
-    val_data = [formatted[i] for i in range(len(formatted)) if i in val_idx]
-    train_dataset = Dataset.from_list(train_data)
-    val_dataset = Dataset.from_list(val_data)
+    train_dataset, val_dataset, split_meta = build_datasets(tokenizer)
     print(f"Dataset: {len(train_dataset)} train | {len(val_dataset)} val")
 
     # ------------------------------------------------------------------
@@ -191,6 +226,7 @@ def main() -> None:
     training_args = SFTConfig(
         output_dir=str(OUTPUT_DIR),
         num_train_epochs=EPOCHS,
+        max_steps=MAX_STEPS,
         per_device_train_batch_size=BATCH_SIZE,
         gradient_accumulation_steps=GRAD_ACC,
         learning_rate=LEARNING_RATE,
@@ -211,7 +247,8 @@ def main() -> None:
         max_seq_length=MAX_SEQ_LEN,
         dataset_text_field="text",
         packing=False,
-        report_to="none",
+        report_to=REPORT_TO,
+        run_name=RUN_NAME,
         dataloader_pin_memory=False,  # Pin memory is not effective on MPS
     )
 
@@ -253,11 +290,14 @@ def main() -> None:
         "device": device,
         "target_modules": get_target_modules(MODEL_ID),
         "learning_rate": LEARNING_RATE,
-        "val_split": VAL_SPLIT,
+        "max_steps": MAX_STEPS,
+        **split_meta,
         "train_examples": len(train_dataset),
         "val_examples": len(val_dataset),
         "use_qlora": USE_QLORA,
         "bnb_bits": actual_bits if USE_QLORA else None,
+        "report_to": REPORT_TO,
+        "run_name": RUN_NAME,
     }
     with open(OUTPUT_DIR / "training_meta.json", "w") as f:
         json.dump(meta, f, indent=2)

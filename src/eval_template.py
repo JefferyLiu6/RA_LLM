@@ -30,10 +30,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from constants import SYSTEM_PROMPT
 
 ROOT = Path(__file__).parent.parent
-ADAPTER_DIR = ROOT / "outputs" / "lora_adapter"
-TEST_PROMPTS_PATH = ROOT / "data" / "test_prompts.jsonl"
-BEFORE_AFTER_PATH = ROOT / "outputs" / "before_after.md"
-EVAL_RESULTS_PATH = ROOT / "outputs" / "eval_results.md"
+ADAPTER_DIR = Path(os.getenv("ADAPTER_DIR", str(ROOT / "outputs" / "lora_adapter")))
+TEST_PROMPTS_PATH = Path(os.getenv("TEST_PROMPTS_PATH", str(ROOT / "data" / "test_prompts.jsonl")))
+BEFORE_AFTER_PATH = Path(os.getenv("BEFORE_AFTER_PATH", str(ROOT / "outputs" / "before_after.md")))
+EVAL_RESULTS_PATH = Path(os.getenv("EVAL_RESULTS_PATH", str(ROOT / "outputs" / "eval_results.md")))
 OUTPUT_DIR = ROOT / "outputs"
 
 GEN_MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "400"))

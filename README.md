@@ -230,6 +230,21 @@ pip install -r requirements.txt
 
 ---
 
+## Mac-First / CUDA-Final Workflow
+
+Use the Mac for local LoRA training, evaluation, dataset work, and documentation. Use CUDA for QLoRA, final DPO, vLLM serving, AWQ, and benchmark claims.
+
+```bash
+make dataset-bootstrap # convert current examples into fixed split files
+make mac-first      # local Apple Silicon pass
+make cuda-train     # final CUDA SFT pass
+make cuda-qlora     # CUDA-only QLoRA pass
+```
+
+See [DATASET.md](DATASET.md) for the dataset pipeline and [docs/mac_cuda_workflow.md](docs/mac_cuda_workflow.md) for the compute handoff.
+
+---
+
 ## Train
 
 ```bash
@@ -249,7 +264,11 @@ Key flags overridable via environment variables:
 | `GRAD_ACC`    | `8`                          | Gradient accumulation steps      |
 | `EPOCHS`      | `3`                          | Training epochs                  |
 | `LORA_R`      | `16`                         | LoRA rank                        |
+| `DATA_PATH`   | `data/dataset.jsonl`         | Combined dataset for random split |
+| `TRAIN_PATH`  | unset                        | Explicit train split JSONL       |
+| `VAL_PATH`    | unset                        | Explicit validation split JSONL  |
 | `VAL_SPLIT`   | `0.1`                        | Fraction held out for validation |
+| `REPORT_TO`   | `none`                       | Trainer reporting target, e.g. `wandb` |
 
 
 Memory-constrained example:
