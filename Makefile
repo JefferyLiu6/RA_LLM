@@ -34,7 +34,7 @@ help:
 	@printf "DPO targets:\n"
 	@printf "  make dpo-pairs         Build hard near-miss train/val DPO preference pairs\n\n"
 	@printf "Evaluation targets:\n"
-	@printf "  make sft-quality       Score cached SFT before/after outputs for content quality\n\n"
+	@printf "  make sft-quality       Score cached SFT before/after outputs for content quality\n"
 	@printf "  make dpo-quality       Score cached DPO before/after outputs for content quality\n\n"
 	@printf "Presentation targets:\n"
 	@printf "  make readme-assets     Regenerate README SVG result and pipeline visuals\n\n"
@@ -91,7 +91,7 @@ dpo-pairs:
 	$(PYTHON) src/build_dpo_pairs.py --input $(SFT_TRAIN_PATH) --input $(SFT_VAL_PATH) --output $(DPO_OUTPUT) --report $(DPO_REPORT) --max-pairs $(DPO_MAX_PAIRS) --pairs-per-record $(DPO_PAIRS_PER_RECORD) --negative-mode $(DPO_NEGATIVE_MODE)
 
 sft-quality:
-	TEST_PROMPTS_PATH=$(SFT_TEST_PATH) BEFORE_AFTER_PATH=outputs/sft_before_after.md QUALITY_RESULTS_PATH=outputs/sft_quality_results.md QUALITY_DETAILS_PATH=outputs/sft_quality_details.csv $(PYTHON) src/eval_sft_quality.py
+	QUALITY_REPORT_TITLE="SFT Quality Evaluation" ADAPTER_LABEL=LoRA TEST_PROMPTS_PATH=$(SFT_TEST_PATH) BEFORE_AFTER_PATH=outputs/sft_before_after.md QUALITY_RESULTS_PATH=outputs/sft_quality_results.md QUALITY_DETAILS_PATH=outputs/sft_quality_details.csv $(PYTHON) src/eval_sft_quality.py
 
 dpo-quality:
 	QUALITY_REPORT_TITLE="DPO Quality Evaluation" ADAPTER_LABEL=DPO TEST_PROMPTS_PATH=$(SFT_TEST_PATH) BEFORE_AFTER_PATH=outputs/dpo_before_after.md QUALITY_RESULTS_PATH=outputs/dpo_quality_results.md QUALITY_DETAILS_PATH=outputs/dpo_quality_details.csv $(PYTHON) src/eval_sft_quality.py

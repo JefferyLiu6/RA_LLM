@@ -10,8 +10,8 @@ The content metrics compare generated outputs against the held-out reference ans
 
 | Model | Format Compliance | Content Alignment | Ref Token F1 | Key-Term Recall | Unsupported Terms | Follow-up Valid | Formulaic Rate | Grammar Flags | Avg Words |
 |-------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---:|
-| base | 38% | 29% | 27% | 26% | 60% | 51% | 0% | 0% | 101.9 |
-| lora | 99% | 86% | 86% | 84% | 11% | 99% | 99% | 2% | 123.8 |
+| Base | 38% | 29% | 27% | 26% | 60% | 51% | 0% | 0% | 101.9 |
+| LoRA | 99% | 86% | 86% | 84% | 11% | 99% | 99% | 2% | 123.8 |
 
 ## Interpretation
 

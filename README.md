@@ -424,6 +424,8 @@ Current DPO rerun:
 | Held-out content alignment | 83% |
 | Held-out unsupported terms | 13% |
 
+Note: `outputs/dpo_eval_results.md` includes a fresh base-model row from the DPO eval run, where the tightened follow-up prompt raises base compliance to 84%. The project-wide baseline claim uses `outputs/sft_eval_results.md`, where the same held-out split shows 38% base compliance before SFT.
+
 The evaluator uses deterministic decoding by default. To intentionally sample during exploratory evals, pass `DO_SAMPLE=1`.
 
 ---

@@ -10,7 +10,7 @@ The content metrics compare generated outputs against the held-out reference ans
 
 | Model | Format Compliance | Content Alignment | Ref Token F1 | Key-Term Recall | Unsupported Terms | Follow-up Valid | Formulaic Rate | Grammar Flags | Avg Words |
 |-------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---:|
-| base | 84% | 30% | 28% | 24% | 55% | 100% | 0% | 0% | 77.8 |
+| Base | 84% | 30% | 28% | 24% | 55% | 100% | 0% | 0% | 77.8 |
 | DPO | 100% | 83% | 84% | 81% | 13% | 100% | 100% | 2% | 123.6 |
 
 ## Interpretation

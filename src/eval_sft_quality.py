@@ -247,7 +247,7 @@ def render_markdown(rows_by_model: dict[str, list[dict]], records_by_id: dict[st
         "|-------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---:|",
     ]
 
-    display_names = {"base": "base", "lora": ADAPTER_LABEL}
+    display_names = {"base": "Base", "lora": ADAPTER_LABEL}
     for model_name in ["base", "lora"]:
         s = summaries[model_name]
         lines.append(
