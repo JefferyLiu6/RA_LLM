@@ -1,11 +1,11 @@
 """
-Evaluate template-adherence of base model vs LoRA adapter on 10 held-out prompts.
+Evaluate template-adherence of base model vs LoRA adapter on held-out prompts.
 
 Checks each output for:
   - Summary section present
   - Key Points section present with exactly 3 bullet points
   - Limitation section present
-  - Follow-up Question section present
+  - Follow-up Question section present and ending with '?'
 
 Prints a per-prompt table and writes outputs/eval_results.md.
 
@@ -37,6 +37,16 @@ EVAL_RESULTS_PATH = Path(os.getenv("EVAL_RESULTS_PATH", str(ROOT / "outputs" / "
 OUTPUT_DIR = ROOT / "outputs"
 
 GEN_MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "400"))
+GEN_TEMPERATURE = float(os.getenv("TEMPERATURE", "0.1"))
+GEN_DO_SAMPLE = os.getenv("DO_SAMPLE", "0") == "1"
+EVAL_LIMIT = int(os.getenv("EVAL_LIMIT", "0"))
+LOCAL_FILES_ONLY = os.getenv("LOCAL_FILES_ONLY", "0") == "1"
+ADAPTER_LABEL = os.getenv("ADAPTER_LABEL", "LoRA")
+EVAL_IDS = {
+    item.strip()
+    for item in os.getenv("EVAL_IDS", "").split(",")
+    if item.strip()
+}
 
 
 # ---------------------------------------------------------------------------
@@ -47,8 +57,8 @@ REQUIRED_SECTIONS = [
     ("summary", re.compile(r"^\s*Summary\s*:", re.MULTILINE | re.IGNORECASE)),
     ("key_points", re.compile(r"^\s*Key Points\s*:", re.MULTILINE | re.IGNORECASE)),
     ("limitation", re.compile(r"^\s*Limitation\s*:", re.MULTILINE | re.IGNORECASE)),
-    ("follow_up", re.compile(r"^\s*Follow-up Question\s*:", re.MULTILINE | re.IGNORECASE)),
 ]
+FOLLOW_UP_RE = re.compile(r"^\s*Follow-up Question\s*:\s*(.*?)$", re.DOTALL | re.MULTILINE | re.IGNORECASE)
 
 BULLET_RE = re.compile(r"^\s*[-*]\s+\S", re.MULTILINE)
 
@@ -59,6 +69,10 @@ def check_compliance(text: str) -> dict:
 
     for name, pattern in REQUIRED_SECTIONS:
         results[name] = bool(pattern.search(text))
+
+    follow_up_match = FOLLOW_UP_RE.search(text)
+    follow_up_text = follow_up_match.group(1).strip() if follow_up_match else ""
+    results["follow_up"] = bool(follow_up_text) and follow_up_text.endswith("?")
 
     # Count bullet points that appear after 'Key Points:'
     kp_match = re.search(r"Key Points\s*:(.*?)(?:Limitation\s*:|$)", text, re.DOTALL | re.IGNORECASE)
@@ -96,7 +110,11 @@ def detect_device() -> str:
 
 
 def load_base_model(model_id: str, device: str):
-    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+        local_files_only=LOCAL_FILES_ONLY,
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
@@ -104,6 +122,7 @@ def load_base_model(model_id: str, device: str):
         torch_dtype=torch.float32,
         device_map={"": device},
         trust_remote_code=True,
+        local_files_only=LOCAL_FILES_ONLY,
     )
     model.eval()
     return model, tokenizer
@@ -121,20 +140,41 @@ def build_prompt(user_text: str, tokenizer) -> str:
 
 def generate(model, tokenizer, prompt_text: str, device: str) -> str:
     inputs = tokenizer(prompt_text, return_tensors="pt").to(device)
+    generation_kwargs = {
+        "max_new_tokens": GEN_MAX_NEW_TOKENS,
+        "do_sample": GEN_DO_SAMPLE,
+        "pad_token_id": tokenizer.pad_token_id,
+        "eos_token_id": tokenizer.eos_token_id,
+    }
+    if GEN_DO_SAMPLE:
+        generation_kwargs["temperature"] = GEN_TEMPERATURE
+
     with torch.no_grad():
         out = model.generate(
             **inputs,
-            max_new_tokens=GEN_MAX_NEW_TOKENS,
-            temperature=0.1,
-            do_sample=True,
-            pad_token_id=tokenizer.pad_token_id,
-            eos_token_id=tokenizer.eos_token_id,
+            **generation_kwargs,
         )
     new_tokens = out[0][inputs["input_ids"].shape[1]:]
     return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
 
-def run_inference_for_eval(model_id: str) -> tuple[list[str], list[str]]:
+def load_eval_prompts() -> list[dict]:
+    with open(TEST_PROMPTS_PATH) as f:
+        prompts = [json.loads(line) for line in f if line.strip()]
+
+    if EVAL_IDS:
+        prompts = [prompt for prompt in prompts if prompt.get("id") in EVAL_IDS]
+        missing = sorted(EVAL_IDS - {prompt.get("id") for prompt in prompts})
+        if missing:
+            raise ValueError(f"EVAL_IDS not found in {TEST_PROMPTS_PATH}: {missing}")
+
+    if EVAL_LIMIT > 0:
+        prompts = prompts[:EVAL_LIMIT]
+
+    return prompts
+
+
+def run_inference_for_eval(model_id: str, prompts: list[dict]) -> tuple[list[str], list[str]]:
     """Generate base and lora outputs for all test prompts."""
     device = detect_device()
     print(f"Device: {device}")
@@ -144,9 +184,6 @@ def run_inference_for_eval(model_id: str) -> tuple[list[str], list[str]]:
             f"Adapter directory not found: {ADAPTER_DIR}\n"
             "Run `python src/train_lora.py` first."
         )
-
-    with open(TEST_PROMPTS_PATH) as f:
-        prompts = [json.loads(line) for line in f if line.strip()]
 
     print(f"Loading base model {model_id}...")
     base_model, tokenizer = load_base_model(model_id, device)
@@ -179,14 +216,18 @@ def parse_outputs_from_report(report_path: Path) -> tuple[list[str], list[str]]:
     Expects fenced code blocks alternating base/lora per prompt.
     """
     text = report_path.read_text()
-    # Split on prompt blocks: each starts with "## test_"
-    blocks = re.split(r"\n## test_\d+", text)[1:]  # skip preamble
+    blocks = re.split(r"\n##\s+[^\n]+", text)[1:]  # skip preamble
+
+    if not blocks:
+        blocks = re.split(r"\n## test_\d+", text)[1:]  # legacy report format
 
     base_outputs, lora_outputs = [], []
     for block in blocks:
-        # Each block has two fenced code blocks: first is base, second is lora
         fenced = re.findall(r"```\n(.*?)```", block, re.DOTALL)
-        if len(fenced) >= 2:
+        if len(fenced) >= 3:
+            base_outputs.append(fenced[1].strip())
+            lora_outputs.append(fenced[2].strip())
+        elif len(fenced) >= 2:
             base_outputs.append(fenced[0].strip())
             lora_outputs.append(fenced[1].strip())
         else:
@@ -194,6 +235,50 @@ def parse_outputs_from_report(report_path: Path) -> tuple[list[str], list[str]]:
             lora_outputs.append("")
 
     return base_outputs, lora_outputs
+
+
+def render_before_after_report(
+    prompt_ids: list[str],
+    prompts: list[dict],
+    base_outputs: list[str],
+    lora_outputs: list[str],
+    model_id: str,
+) -> str:
+    sections = [
+        "# Before / After Evaluation Outputs",
+        "",
+        f"Base model: `{model_id}`  ",
+        f"Adapter: `{ADAPTER_DIR}`  ",
+        f"Prompts: `{TEST_PROMPTS_PATH}`  ",
+        f"Count: {len(prompts)}",
+        "",
+    ]
+
+    for pid, prompt, base_out, lora_out in zip(prompt_ids, prompts, base_outputs, lora_outputs):
+        sections.extend([
+            f"## {pid}",
+            "",
+            "### Input",
+            "",
+            "```",
+            prompt["input"].strip(),
+            "```",
+            "",
+            "### Base",
+            "",
+            "```",
+            base_out.strip(),
+            "```",
+            "",
+            "### LoRA",
+            "",
+            "```",
+            lora_out.strip(),
+            "```",
+            "",
+        ])
+
+    return "\n".join(sections)
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +306,7 @@ def render_table(
     col_keys = ["summary", "key_points", "three_bullets", "limitation", "follow_up", "all_pass"]
     col_labels = ["Summary", "Key Points", "3 Bullets", "Limitation", "Follow-up Q", "PASS"]
 
-    header = "| Prompt | " + " | ".join(f"Base {l}" for l in col_labels) + " | " + " | ".join(f"LoRA {l}" for l in col_labels) + " |"
+    header = "| Prompt | " + " | ".join(f"Base {l}" for l in col_labels) + " | " + " | ".join(f"{ADAPTER_LABEL} {l}" for l in col_labels) + " |"
     sep = "|--------|" + "|".join(["-------"] * len(col_keys) * 2) + "|"
 
     rows = [header, sep]
@@ -243,13 +328,13 @@ def render_summary(base_checks: list[dict], lora_checks: list[dict], n: int) -> 
         f"| Model | Fully Compliant | Score |",
         f"|-------|----------------|-------|",
         f"| Base  | {base_pass}/{n}            | {base_pass/n*100:.0f}%   |",
-        f"| LoRA  | {lora_pass}/{n}            | {lora_pass/n*100:.0f}%   |",
+        f"| {ADAPTER_LABEL}  | {lora_pass}/{n}            | {lora_pass/n*100:.0f}%   |",
         "",
     ]
 
     # Per-section breakdown
     lines += ["## Per-Section Compliance", ""]
-    lines += [f"| Section | Base | LoRA |", "|---------|------|------|"]
+    lines += [f"| Section | Base | {ADAPTER_LABEL} |", "|---------|------|------|"]
     for key, label in SECTION_NAMES.items():
         base_sect = sum(1 for c in base_checks if c.get(key, False))
         lora_sect = sum(1 for c in lora_checks if c.get(key, False))
@@ -270,7 +355,7 @@ def print_results_to_stdout(
     print("\n" + "=" * 70)
     print("TEMPLATE COMPLIANCE EVALUATION")
     print("=" * 70)
-    print(f"\n{'Prompt':<12} {'Base':>20} {'LoRA':>20}")
+    print(f"\n{'Prompt':<12} {'Base':>20} {ADAPTER_LABEL:>20}")
     print("-" * 54)
     for pid, bc, lc in zip(prompt_ids, base_checks, lora_checks):
         b_str = "PASS" if bc["all_pass"] else f"FAIL (bullets:{bc['bullet_count']})"
@@ -279,15 +364,15 @@ def print_results_to_stdout(
 
     print("-" * 54)
     print(f"\nBase model:  {base_pass}/{n} fully compliant  ({base_pass/n*100:.0f}%)")
-    print(f"LoRA adapter: {lora_pass}/{n} fully compliant  ({lora_pass/n*100:.0f}%)")
+    print(f"{ADAPTER_LABEL} adapter: {lora_pass}/{n} fully compliant  ({lora_pass/n*100:.0f}%)")
 
     improvement = lora_pass - base_pass
     if improvement > 0:
-        print(f"\nLoRA improved template compliance by +{improvement} prompts.")
+        print(f"\n{ADAPTER_LABEL} improved template compliance by +{improvement} prompts.")
     elif improvement == 0:
-        print("\nNo change in compliance between base and LoRA.")
+        print(f"\nNo change in compliance between base and {ADAPTER_LABEL}.")
     else:
-        print(f"\nBase outperformed LoRA by {-improvement} prompts.")
+        print(f"\nBase outperformed {ADAPTER_LABEL} by {-improvement} prompts.")
     print()
 
 
@@ -312,8 +397,7 @@ def main() -> None:
     else:
         model_id = "Qwen/Qwen2.5-1.5B-Instruct"
 
-    with open(TEST_PROMPTS_PATH) as f:
-        prompts = [json.loads(line) for line in f if line.strip()]
+    prompts = load_eval_prompts()
     prompt_ids = [ex.get("id", f"test_{i:02d}") for i, ex in enumerate(prompts, 1)]
     n = len(prompts)
 
@@ -323,10 +407,18 @@ def main() -> None:
         base_outputs, lora_outputs = parse_outputs_from_report(BEFORE_AFTER_PATH)
         if len(base_outputs) != n or len(lora_outputs) != n:
             print("Warning: report parsing yielded unexpected number of outputs; regenerating.")
-            base_outputs, lora_outputs = run_inference_for_eval(model_id)
+            base_outputs, lora_outputs = run_inference_for_eval(model_id, prompts)
+            BEFORE_AFTER_PATH.write_text(
+                render_before_after_report(prompt_ids, prompts, base_outputs, lora_outputs, model_id)
+            )
     else:
         print("Generating model outputs for evaluation...")
-        base_outputs, lora_outputs = run_inference_for_eval(model_id)
+        base_outputs, lora_outputs = run_inference_for_eval(model_id, prompts)
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        BEFORE_AFTER_PATH.write_text(
+            render_before_after_report(prompt_ids, prompts, base_outputs, lora_outputs, model_id)
+        )
+        print(f"Before/after report written to: {BEFORE_AFTER_PATH}")
 
     # Compute compliance
     _, base_checks = compliance_score(base_outputs)
@@ -341,6 +433,8 @@ def main() -> None:
         "# Template Compliance Evaluation",
         f"\nBase model: `{model_id}`  ",
         f"Adapter: `{ADAPTER_DIR}`\n",
+        f"Prompts: `{TEST_PROMPTS_PATH}`  ",
+        f"Count: {n}\n",
         render_summary(base_checks, lora_checks, n),
         "## Per-Prompt Detail",
         "",

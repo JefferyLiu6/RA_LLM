@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="670" viewBox="0 0 1400 670" role="img" aria-label="DPO hard-negative pipeline">
+<defs>
+<filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+<feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
+</filter>
+</defs>
+<rect width="1400" height="670" fill="#f8fafc"/>
+<text x="70" y="78" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="800" text-anchor="start">DPO Hard-Negative Alignment</text>
+<text x="70" y="113" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="500" text-anchor="start">Preference tuning targets real failure modes without using the held-out test split.</text>
+<rect x="90" y="205" width="255" height="190" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<rect x="112" y="229" width="58" height="12" rx="6" fill="#fef3c7" stroke="none"/>
+<text x="112" y="277" fill="#d97706" font-family="Inter,Arial,sans-serif" font-size="25" font-weight="800" text-anchor="start">SFT adapter</text>
+<text x="112" y="315" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">99% format compliance</text>
+<text x="112" y="342" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">but occasional strict failures</text>
+<line x1="352" y1="300" x2="395" y2="300" stroke="#4b5563" stroke-width="3"/>
+<text x="376" y="293" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" text-anchor="middle">&gt;</text>
+<rect x="410" y="205" width="255" height="190" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<rect x="432" y="229" width="58" height="12" rx="6" fill="#dbeafe" stroke="none"/>
+<text x="432" y="277" fill="#2563eb" font-family="Inter,Arial,sans-serif" font-size="25" font-weight="800" text-anchor="start">300 preference pairs</text>
+<text x="432" y="315" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">258 train / 42 val</text>
+<text x="432" y="342" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">0 test examples used</text>
+<line x1="672" y1="300" x2="715" y2="300" stroke="#4b5563" stroke-width="3"/>
+<text x="696" y="293" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" text-anchor="middle">&gt;</text>
+<rect x="730" y="205" width="255" height="190" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<rect x="752" y="229" width="58" height="12" rx="6" fill="#fee2e2" stroke="none"/>
+<text x="752" y="277" fill="#dc2626" font-family="Inter,Arial,sans-serif" font-size="25" font-weight="800" text-anchor="start">Hard rejected answers</text>
+<text x="752" y="315" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">extra bullet</text>
+<text x="752" y="342" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">unsupported claim</text>
+<text x="752" y="369" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">extra follow-up text</text>
+<line x1="992" y1="300" x2="1035" y2="300" stroke="#4b5563" stroke-width="3"/>
+<text x="1016" y="293" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" text-anchor="middle">&gt;</text>
+<rect x="1050" y="205" width="255" height="190" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<rect x="1072" y="229" width="58" height="12" rx="6" fill="#d1fae5" stroke="none"/>
+<text x="1072" y="277" fill="#059669" font-family="Inter,Arial,sans-serif" font-size="25" font-weight="800" text-anchor="start">DPO adapter</text>
+<text x="1072" y="315" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">125/125 held-out</text>
+<text x="1072" y="342" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">strict compliance</text>
+<rect x="90" y="475" width="1220" height="105" rx="14" fill="#ffffff" stroke="#dbe3ef"/>
+<text x="125" y="520" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="25" font-weight="800" text-anchor="start">Result</text>
+<text x="235" y="520" fill="#059669" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="650" text-anchor="start">DPO reduces held-out template failures to zero while keeping content alignment at 83%.</text>
+<text x="125" y="552" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">Honest claim: stronger format reliability. Do not claim DPO beat SFT on content quality.</text>
+</svg>

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-label="Project results overview">
+<defs>
+<filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+<feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
+</filter>
+</defs>
+<rect width="1400" height="820" fill="#f8fafc"/>
+<text x="70" y="88" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="800" text-anchor="start">Structured ML Notes Adapter</text>
+<text x="70" y="124" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="500" text-anchor="start">Qwen2.5-1.5B LoRA + DPO for reliable research-note formatting</text>
+<rect x="70" y="165" width="280" height="155" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<rect x="90" y="188" width="54" height="12" rx="6" fill="#dbeafe" stroke="none"/>
+<text x="90" y="228" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="20" font-weight="700" text-anchor="start">Dataset</text>
+<text x="90" y="274" fill="#2563eb" font-family="Inter,Arial,sans-serif" font-size="46" font-weight="850" text-anchor="start">600</text>
+<text x="90" y="303" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="500" text-anchor="start">examples with metadata</text>
+<rect x="385" y="165" width="280" height="155" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<rect x="405" y="188" width="54" height="12" rx="6" fill="#ede9fe" stroke="none"/>
+<text x="405" y="228" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="20" font-weight="700" text-anchor="start">Held-out test</text>
+<text x="405" y="274" fill="#7c3aed" font-family="Inter,Arial,sans-serif" font-size="46" font-weight="850" text-anchor="start">125</text>
+<text x="405" y="303" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="500" text-anchor="start">prompts never used for training</text>
+<rect x="700" y="165" width="280" height="155" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<rect x="720" y="188" width="54" height="12" rx="6" fill="#fef3c7" stroke="none"/>
+<text x="720" y="228" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="20" font-weight="700" text-anchor="start">SFT compliance</text>
+<text x="720" y="274" fill="#d97706" font-family="Inter,Arial,sans-serif" font-size="46" font-weight="850" text-anchor="start">99%</text>
+<text x="720" y="303" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="500" text-anchor="start">after LoRA supervised tuning</text>
+<rect x="1015" y="165" width="280" height="155" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<rect x="1035" y="188" width="54" height="12" rx="6" fill="#d1fae5" stroke="none"/>
+<text x="1035" y="228" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="20" font-weight="700" text-anchor="start">DPO compliance</text>
+<text x="1035" y="274" fill="#059669" font-family="Inter,Arial,sans-serif" font-size="46" font-weight="850" text-anchor="start">100%</text>
+<text x="1035" y="303" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="500" text-anchor="start">after hard-negative preference tuning</text>
+<rect x="70" y="370" width="620" height="360" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<text x="105" y="420" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="28" font-weight="800" text-anchor="start">Template Compliance</text>
+<text x="105" y="452" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">Required sections, exactly 3 bullets, valid follow-up question</text>
+<rect x="115" y="505" width="420" height="28" rx="7" fill="#edf2f7" stroke="none"/>
+<rect x="115" y="505" width="160" height="28" rx="7" fill="#dc2626" stroke="none"/>
+<text x="115" y="495" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="650" text-anchor="start">Base model</text>
+<text x="557" y="528" fill="#dc2626" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="750" text-anchor="start">38%</text>
+<rect x="115" y="590" width="420" height="28" rx="7" fill="#edf2f7" stroke="none"/>
+<rect x="115" y="590" width="416" height="28" rx="7" fill="#d97706" stroke="none"/>
+<text x="115" y="580" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="650" text-anchor="start">SFT LoRA</text>
+<text x="557" y="613" fill="#d97706" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="750" text-anchor="start">99%</text>
+<rect x="115" y="675" width="420" height="28" rx="7" fill="#edf2f7" stroke="none"/>
+<rect x="115" y="675" width="420" height="28" rx="7" fill="#059669" stroke="none"/>
+<text x="115" y="665" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="650" text-anchor="start">DPO</text>
+<text x="557" y="698" fill="#059669" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="750" text-anchor="start">100%</text>
+<rect x="740" y="370" width="590" height="360" rx="14" fill="#ffffff" stroke="#dbe3ef" filter="url(#shadow)"/>
+<text x="775" y="420" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="28" font-weight="800" text-anchor="start">Quality Guardrails</text>
+<text x="775" y="452" fill="#4b5563" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="500" text-anchor="start">Reference-overlap heuristics on the 125-prompt test set</text>
+<rect x="790" y="505" width="360" height="28" rx="7" fill="#edf2f7" stroke="none"/>
+<rect x="790" y="505" width="310" height="28" rx="7" fill="#d97706" stroke="none"/>
+<text x="790" y="495" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="650" text-anchor="start">SFT content alignment</text>
+<text x="1172" y="528" fill="#d97706" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="750" text-anchor="start">86%</text>
+<rect x="790" y="590" width="360" height="28" rx="7" fill="#edf2f7" stroke="none"/>
+<rect x="790" y="590" width="299" height="28" rx="7" fill="#059669" stroke="none"/>
+<text x="790" y="580" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="650" text-anchor="start">DPO content alignment</text>
+<text x="1172" y="613" fill="#059669" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="750" text-anchor="start">83%</text>
+<rect x="790" y="675" width="360" height="28" rx="7" fill="#edf2f7" stroke="none"/>
+<rect x="790" y="675" width="313" height="28" rx="7" fill="#0f766e" stroke="none"/>
+<text x="790" y="665" fill="#111827" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="650" text-anchor="start">DPO supported-term rate</text>
+<text x="1172" y="698" fill="#0f766e" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="750" text-anchor="start">87%</text>
+</svg>

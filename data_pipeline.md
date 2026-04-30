@@ -109,7 +109,7 @@ After the pipeline runs:
 ```bash
 TRAIN_PATH=data/sft_train.jsonl \
 VAL_PATH=data/sft_val.jsonl \
-make mac-train
+make mac-train-sft
 ```
 
 On CUDA:
@@ -117,5 +117,5 @@ On CUDA:
 ```bash
 TRAIN_PATH=data/sft_train.jsonl \
 VAL_PATH=data/sft_val.jsonl \
-make cuda-train
+make cuda-train-sft
 ```

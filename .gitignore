@@ -13,6 +13,10 @@ outputs/experiments/**/adapter_model.safetensors
 outputs/experiments/**/optimizer.pt
 outputs/experiments/**/checkpoint-*/
 outputs/lora_adapter/
+outputs/dpo_adapter/
+outputs/dpo_smoke_adapter/
+outputs/smoke_lora_adapter/
+outputs/*_adapter/checkpoint-*/
 
 # ── Trainer binary artifacts ─────────────────────────────
 outputs/**/training_args.bin

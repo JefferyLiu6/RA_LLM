@@ -14,7 +14,7 @@ This project should be developed in two passes:
 | Rank/LR/epoch sweeps | Yes | Yes | Mac first |
 | Deterministic evals and dashboard | Yes | Yes | Mac |
 | W&B experiment logging | Yes | Yes | CUDA final |
-| DPO | Maybe | Yes | CUDA final |
+| DPO | Yes | Yes | Mac first, CUDA final |
 | QLoRA with bitsandbytes | No | Yes | CUDA only |
 | vLLM serving and benchmark | Not for final claim | Yes | CUDA only |
 | AWQ quantization benchmark | No | Yes | CUDA only |
@@ -25,8 +25,13 @@ Use the Mac pass to prove the pipeline and iterate cheaply.
 
 ```bash
 make mac-check
-make mac-train
-make mac-eval
+make mac-smoke-sft
+make mac-train-sft
+make mac-eval-sft
+make dpo-pairs
+make mac-smoke-dpo
+make mac-train-dpo
+make mac-eval-dpo
 ```
 
 `make mac-check` must print `mps_available=True`. If it fails, fix the local PyTorch/MPS install before running `make mac-first`; otherwise training will fall back to CPU and be too slow.
@@ -37,7 +42,7 @@ For a one-command local pass:
 make mac-first
 ```
 
-The Mac pass writes the standard adapter to `outputs/lora_adapter/` so the existing notebook and eval scripts continue to work.
+`make mac-first` still uses the legacy dataset path. For the upgraded 600-record dataset, prefer `make mac-smoke-sft` followed by `make mac-train-sft`. The Mac pass writes the standard adapter to `outputs/lora_adapter/` so the existing notebook and eval scripts continue to work.
 
 For the experiment-level report and dashboard, run the Mac-safe sweep first:
 
@@ -49,12 +54,15 @@ On Mac, the QLoRA experiment is skipped automatically because bitsandbytes QLoRA
 
 ## CUDA Pass
 
-Use the RTX 4090/Linux box for the final training and any benchmark claims.
+Use the RTX 4090/Linux box for final benchmark claims and CUDA-only experiments.
 
 ```bash
 make cuda-check
-make cuda-train
-make cuda-eval
+make cuda-smoke-sft
+make cuda-train-sft
+make cuda-eval-sft
+make cuda-train-dpo
+make cuda-eval-dpo
 ```
 
 Run QLoRA only on CUDA:
@@ -79,7 +87,7 @@ The trainer now supports explicit split files. Once the expanded dataset exists,
 TRAIN_PATH=data/sft_train.jsonl \
 VAL_PATH=data/sft_val.jsonl \
 MAC_OUTPUT_DIR=outputs/lora_adapter \
-make mac-train
+make mac-train-sft
 ```
 
 On CUDA:
@@ -88,7 +96,7 @@ On CUDA:
 TRAIN_PATH=data/sft_train.jsonl \
 VAL_PATH=data/sft_val.jsonl \
 CUDA_OUTPUT_DIR=outputs/cuda_lora_adapter \
-make cuda-train
+make cuda-train-sft
 ```
 
 If `TRAIN_PATH` and `VAL_PATH` are not set, training falls back to the existing `data/dataset.jsonl` plus `VAL_SPLIT=0.1` random split.

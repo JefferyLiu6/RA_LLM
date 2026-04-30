@@ -1,6 +1,21 @@
-# LoRA Research Notes Adapter
+# Structured ML Notes Adapter
 
-A weekend LoRA project that teaches a small instruct model to convert ML technical text into structured research notes.
+A reproducible LoRA + DPO fine-tuning project that turns messy ML concepts and short abstracts into consistent research notes: summary, three key points, limitation, and follow-up question.
+
+The project addresses a practical evaluation problem: unstructured model outputs are hard to compare automatically. By enforcing a stable note schema, downstream scoring, review, and dataset iteration become much easier.
+
+![Current project results: 600 examples, 125 held-out prompts, 99% SFT compliance, 100% DPO compliance](assets/screenshots/project_results.svg)
+
+## Impact
+
+| Stage | Dataset / eval | Main result |
+|-------|----------------|-------------|
+| Dataset upgrade | 68 gold examples -> 600 metadata-rich records | Fixed 400 / 75 / 125 train-val-test split |
+| SFT LoRA | 125 held-out prompts | 99% strict template compliance |
+| DPO hard negatives | 300 train/val preference pairs | 100% strict template compliance |
+| Quality guardrail | Reference-overlap heuristic | DPO: 83% content alignment, 13% unsupported terms |
+
+Resume-safe claim: this project reduces held-out output-format failures from 62% to 0% for a structured ML research-note assistant. It does not claim that DPO beats SFT on content quality; SFT remains slightly higher on the heuristic content-alignment score.
 
 ## How LoRA Works
 
@@ -112,34 +127,42 @@ LoRA's frozen backbone is the key reason this project runs on a MacBook: the opt
 ```mermaid
 flowchart TD
     subgraph dataPrep ["1 · Data Preparation"]
-        DS["dataset.jsonl\n68 training examples"]
-        TP["test_prompts.jsonl\n10 held-out prompts"]
+        GOLD["dataset.jsonl\n68 gold examples"]
+        SYN["synthetic_codex.jsonl\n532 synthetic examples"]
+        SPLIT["fixed split\n400 train · 75 val · 125 test"]
         FMT["format_chat\nWrap in chat template\nsystem + user + assistant"]
-        DS --> FMT
+        GOLD --> SPLIT
+        SYN --> SPLIT
+        SPLIT --> FMT
     end
 
     subgraph training ["2 · Training"]
         BASE["Qwen2.5-1.5B-Instruct\nfrozen backbone"]
         LORA["LoraConfig\nr · alpha · target_modules"]
         SFT["SFTTrainer  TRL\nCausalLM · MPS · fp32"]
+        DPOPAIRS["DPO pairs\nhard near-miss negatives"]
+        DPO["DPOTrainer\npolicy adapter vs frozen reference adapter"]
         FMT --> SFT
         BASE --> SFT
         LORA --> SFT
         SFT --> ADAPTER["outputs/lora_adapter/\nadapter_model.safetensors"]
+        ADAPTER --> DPO
+        DPOPAIRS --> DPO
+        DPO --> DPOADAPTER["outputs/dpo_adapter/\nadapter_model.safetensors"]
     end
 
     subgraph inference ["3 · Inference"]
         INFER["infer.py\nload base  →  disable adapter  →  generate\nload base  →  enable adapter   →  generate"]
-        ADAPTER --> INFER
+        DPOADAPTER --> INFER
         BASE --> INFER
-        TP --> INFER
-        INFER --> REPORT["outputs/before_after.md"]
+        SPLIT --> INFER
+        INFER --> REPORT["outputs/dpo_before_after.md"]
     end
 
     subgraph evaluation ["4 · Evaluation"]
         EVAL["eval_template.py\nCheck each output for:\n· Summary present\n· Key Points present\n· Exactly 3 bullets\n· Limitation present\n· Follow-up Question present"]
         REPORT --> EVAL
-        EVAL --> SCORES["outputs/eval_results.md\nBase: 10%  →  LoRA: 70–100%"]
+        EVAL --> SCORES["outputs/dpo_eval_results.md\nDPO: 125/125 compliant"]
     end
 ```
 
@@ -187,25 +210,35 @@ Follow-up Question:
 ```
 research_ass/
 ├── data/
-│   ├── dataset.jsonl              # 68 training examples
-│   └── test_prompts.jsonl         # 11 held-out prompts
+│   ├── dataset.jsonl              # Original 68 gold examples
+│   ├── sft_train.jsonl            # 400-example fixed train split
+│   ├── sft_val.jsonl              # 75-example fixed validation split
+│   ├── sft_test.jsonl             # 125-example held-out test split
+│   └── dpo_pairs.jsonl            # 300 train/val preference pairs
 ├── notebooks/
 │   └── demo.ipynb                 # End-to-end: load adapter → infer → evaluate
 ├── src/
 │   ├── train_lora.py              # SFTTrainer entrypoint
+│   ├── train_dpo.py               # DPOTrainer entrypoint on top of SFT adapter
+│   ├── build_dpo_pairs.py         # DPO preference-pair builder
 │   ├── run_experiments.py         # Hyperparameter sweep runner
 │   ├── infer.py                   # Base vs LoRA inference comparison
 │   ├── eval_template.py           # Format compliance evaluator
+│   ├── eval_sft_quality.py        # Fixed-split content quality evaluator
 │   ├── eval_content.py            # Lexical / specificity content metrics
 │   ├── eval_rubric.py             # Heuristic rubric scorer (0–12)
 │   ├── dashboard.py               # Builds outputs/dashboard.html
 │   └── constants.py               # Shared system prompt
 ├── assets/
-│   └── screenshots/               # Dashboard and comparison screenshots
+│   └── screenshots/               # README result and pipeline visuals
 ├── outputs/
 │   ├── lora_adapter/              # Saved adapter weights (gitignored)
 │   ├── experiments/               # Per-experiment adapter configs
 │   ├── before_after.md            # Per-prompt base vs LoRA comparison
+│   ├── sft_eval_results.md        # 125-prompt fixed-split compliance report
+│   ├── sft_quality_results.md     # 125-prompt fixed-split content metrics
+│   ├── dpo_eval_results.md        # 125-prompt DPO compliance report
+│   ├── dpo_quality_results.md     # 125-prompt DPO content metrics
 │   ├── experiment_results.md      # Compliance + loss sweep table
 │   ├── content_comparison.md      # Full output text per experiment
 │   ├── content_metrics.md         # Avg lexical diversity / specificity
@@ -236,9 +269,17 @@ Use the Mac for local LoRA training, evaluation, dataset work, and documentation
 
 ```bash
 make dataset-bootstrap # convert current examples into fixed split files
-make mac-first      # local Apple Silicon pass
-make cuda-train     # final CUDA SFT pass
-make cuda-qlora     # CUDA-only QLoRA pass
+make data-pipeline     # generate/validate the 600-record fixed split dataset
+make mac-smoke-sft     # quick fixed-split training smoke test
+make mac-train-sft     # local Apple Silicon SFT pass
+make dpo-pairs         # build hard near-miss train/val DPO preference pairs
+make mac-smoke-dpo     # one-step DPO smoke run on the SFT adapter
+make mac-eval-sft      # evaluate SFT on the 125-prompt held-out split
+make mac-eval-dpo      # evaluate DPO on the 125-prompt held-out split
+make readme-assets     # regenerate current README SVG charts
+make cuda-train-sft    # final CUDA SFT pass
+make cuda-train-dpo    # final CUDA DPO pass
+make cuda-qlora        # CUDA-only QLoRA pass
 ```
 
 See [DATASET.md](DATASET.md) for the dataset pipeline and [docs/mac_cuda_workflow.md](docs/mac_cuda_workflow.md) for the compute handoff.
@@ -268,6 +309,7 @@ Key flags overridable via environment variables:
 | `TRAIN_PATH`  | unset                        | Explicit train split JSONL       |
 | `VAL_PATH`    | unset                        | Explicit validation split JSONL  |
 | `VAL_SPLIT`   | `0.1`                        | Fraction held out for validation |
+| `MAX_STEPS`   | `-1`                         | Optional cap for smoke runs      |
 | `REPORT_TO`   | `none`                       | Trainer reporting target, e.g. `wandb` |
 
 
@@ -275,6 +317,12 @@ Memory-constrained example:
 
 ```bash
 MAX_SEQ_LEN=256 BATCH_SIZE=1 GRAD_ACC=16 python src/train_lora.py
+```
+
+Train on the fixed 600-record dataset:
+
+```bash
+TRAIN_PATH=data/sft_train.jsonl VAL_PATH=data/sft_val.jsonl python src/train_lora.py
 ```
 
 ---
@@ -285,7 +333,7 @@ MAX_SEQ_LEN=256 BATCH_SIZE=1 GRAD_ACC=16 python src/train_lora.py
 # Single prompt
 python src/infer.py --prompt "Attention is a mechanism in neural networks that assigns weights to input tokens."
 
-# All 10 held-out prompts → outputs/before_after.md
+# Legacy held-out prompts → outputs/before_after.md
 python src/infer.py --test-set
 ```
 
@@ -299,23 +347,98 @@ python src/eval_template.py
 
 Checks each output for all required sections and exactly 3 key-point bullets. Writes `outputs/eval_results.md`.
 
+For the expanded fixed-split SFT dataset:
+
+```bash
+make mac-eval-sft   # writes outputs/sft_eval_results.md + outputs/sft_before_after.md
+make sft-quality    # writes outputs/sft_quality_results.md + outputs/sft_quality_details.csv
+```
+
+Current fixed-split results on 125 held-out prompts:
+
+| Model | Format Compliance | Content Alignment | Ref Token F1 | Key-Term Recall | Unsupported Terms | Follow-up Valid | Formulaic Rate |
+|-------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Base `Qwen2.5-1.5B-Instruct` | 38% | 29% | 27% | 26% | 60% | 51% | 0% |
+| LoRA r=16 SFT | **99%** | **86%** | **86%** | **84%** | **11%** | **99%** | 99% |
+
+`Content Alignment` is a heuristic reference-overlap score, not a human quality rating. The high LoRA formulaic rate is intentional to surface the next quality issue: SFT learned the target schema very reliably, but the next improvement should add style diversity or DPO preference tuning.
+
 ---
 
-## Experiment Results
+## DPO Pair Preparation
 
-The dashboard below shows all 8 experiments at a glance — format compliance per run (bar chart), final train vs val loss (grouped bars), and the full results table.
+```bash
+make dpo-pairs
+```
 
-![Dashboard results tab: compliance and loss across all experiments](assets/screenshots/dashboard_results.png)
+This builds `data/dpo_pairs.jsonl` from `data/sft_train.jsonl` and `data/sft_val.jsonl`, leaving the held-out test split untouched. Each row uses the validated reference output as `chosen` and a hard near-miss answer as `rejected`.
 
-The screenshot below shows the same prompt (`test_01 — softmax`) run through three configurations side by side: the untuned base model, a low-rank adapter (r=8), and a high-rank adapter (r=64).
+The default rejected answers are derived from the same reference answer, then changed to include one targeted flaw:
 
-![Rank comparison: No Adaptation vs LoRA Low Rank vs LoRA High Rank](assets/screenshots/rank_comparison.png)
+- an extra fourth bullet
+- an unsupported claim
+- extra text after the follow-up question
+- a generic limitation/follow-up when more pairs are requested
 
-- **No Adaptation (0% compliant)** — uses `**bold**` markdown headers instead of plain `Header:`, and produces 4 bullets instead of 3
-- **LoRA Low Rank r=8 (55% compliant)** — correct plain headers, correct section order, but only 2 bullets in Key Points
-- **LoRA High Rank r=64 (91% compliant)** — correct plain headers, exactly 3 bullets, proper Limitation and Follow-up Question
+Current DPO pair build:
 
-Results from the hyperparameter sweep conducted after training:
+| Artifact | Value |
+|----------|-------|
+| Pairs | 300 |
+| Source splits | 258 train / 42 val |
+| Pair type | reference output vs hard near-miss negative |
+| Test records used | 0 |
+| Chosen strict-format pass | 300/300 |
+| Rejected strict-format pass | 100/300 |
+
+See [docs/dpo_plan.md](docs/dpo_plan.md) and `outputs/dpo_pair_report.md`.
+
+To run DPO:
+
+```bash
+make mac-smoke-dpo   # validates one optimizer step locally
+make mac-train-dpo   # small Mac/MPS DPO run
+make mac-eval-dpo    # evaluate DPO adapter on the fixed held-out test split
+make cuda-train-dpo  # faster final run on CUDA
+```
+
+`src/train_dpo.py` loads `outputs/lora_adapter` twice into the same base model: a trainable policy adapter and a frozen reference adapter. That means DPO is anchored to the SFT checkpoint, not to the raw base model.
+
+The DPO learning rate defaults to `1e-6` to keep the update close to the already-good SFT adapter. The earlier `5e-6` run overfit the easy synthetic preference task and reduced held-out content alignment.
+
+If the base model is already cached and Hugging Face metadata calls are unavailable, run:
+
+```bash
+LOCAL_FILES_ONLY=1 make mac-train-dpo
+```
+
+Current DPO rerun:
+
+| Metric | Value |
+|--------|------:|
+| Train preference pairs | 258 |
+| Eval preference pairs | 42 |
+| DPO train loss | 0.231 |
+| DPO eval loss | 0.091 |
+| Held-out template compliance | 125/125 |
+| Held-out content alignment | 83% |
+| Held-out unsupported terms | 13% |
+
+The evaluator uses deterministic decoding by default. To intentionally sample during exploratory evals, pass `DO_SAMPLE=1`.
+
+---
+
+## Visual Summary
+
+![Dataset pipeline: 68 gold examples plus 532 synthetic examples become a 600-record fixed split dataset](assets/screenshots/dataset_pipeline.svg)
+
+![DPO hard-negative pipeline: SFT adapter plus 300 preference pairs produces a 125/125 compliant DPO adapter](assets/screenshots/dpo_pipeline.svg)
+
+![Example DPO output: ML concept paragraph converted into structured research notes](assets/screenshots/output_example.svg)
+
+## Legacy LoRA Rank Sweep
+
+Before the 600-example dataset and DPO phase, the project included a 10-prompt LoRA rank/lr/epoch sweep. These results are useful as an ablation, but the headline project claim should use the newer 125-prompt fixed-split SFT/DPO evaluation above.
 
 
 | Experiment | R   | LR   | Epochs | Train Loss | Val Loss | LoRA Compliance  | Base Compliance |
@@ -335,17 +458,7 @@ Results from the hyperparameter sweep conducted after training:
 - `lr=1e-4` is too conservative — higher loss, lower compliance
 - `rank_8` is the practical floor; acceptable but noticeably weaker
 
-### Training Curves
-
-Loss over epochs for all experiments. `lr_1e-4` (teal) converges slowest; `rank_64` and `lr_5e-4` reach the lowest final loss. Validation loss closely tracks training loss across all runs — no signs of overfitting.
-
-![Training and validation loss curves over epochs](assets/screenshots/dashboard_training_curves.png)
-
-### Content Quality Analysis
-
-Beyond format compliance, the radar chart compares lexical diversity, specificity, key-point detail, and follow-up question validity across experiments. `epochs_5` scores highest on detail (longest key-point bullets); `qlora_4bit` and `rank_64` lead on lexical diversity.
-
-![Content analysis: radar chart, avg words per key point, output specificity](assets/screenshots/dashboard_content_analysis.png)
+The older interactive dashboard remains available at `outputs/dashboard.html`, but the README visuals above are the current project presentation assets.
 
 ---
 
@@ -368,25 +481,22 @@ PYTORCH_ENABLE_MPS_FALLBACK=1 python src/train_lora.py
 ## What Success Looks Like
 
 
-| Model                        | Format Compliance |
-| ---------------------------- | ----------------- |
-| Base `Qwen2.5-1.5B-Instruct` | 10% (1/10)        |
-| LoRA r=8                     | 70%               |
-| LoRA r=16 baseline           | 90%               |
-| LoRA r=64 or 5 epochs        | **100%**          |
+| Model / phase | Evaluation | Format compliance | Content alignment |
+| ------------- | ---------- | ----------------: | ----------------: |
+| Base `Qwen2.5-1.5B-Instruct` | SFT held-out split | 38% | 29% |
+| LoRA r=16 SFT | 125 held-out prompts | 99% | 86% |
+| DPO hard-negative adapter | 125 held-out prompts | **100%** | 83% |
 
 
-The base model's failure modes are: wrong bullet count (4–5 instead of 3), `###` markdown headers instead of plain `Header:`, and `**bold**` formatting. The LoRA adapter reliably fixes all three on unseen prompts.
+The base model's failure modes are wrong bullet counts, markdown-style section headers, and follow-up answers that continue after the question. SFT teaches the required schema; DPO hard negatives remove the remaining strict format failures.
 
 ---
 
-## Before / After: Why LoRA Produces Better Output
+## Legacy Before / After: What Fine-Tuning Teaches
 
-![Before / After — No Adaptation vs LoRA Low Rank vs LoRA High Rank](assets/screenshots/before_after_chat.png)
+The same prompt sent to different versions of the model reveals exactly what fine-tuning teaches. This section documents the original 10-prompt rank-sweep analysis; the headline project metrics are the newer 125-prompt SFT/DPO results above.
 
-The same prompt sent to three versions of the model reveals exactly what fine-tuning teaches:
-
-**No Adaptation (Base) — 0% compliant**
+**No Adaptation (Base) — mostly non-compliant**
 The base model has never seen the required output format. It defaults to its general instruction-following behaviour: wrapping section names in `**bold markdown`**, producing a variable number of bullets (3–5), and writing a vague limitation like `- Sensitive to the scale of input data`. None of this matches the target template, so it fails every automated check.
 
 **LoRA — Low Rank (r=8) — ~55–70% compliant**
@@ -399,7 +509,7 @@ The core lesson: LoRA does not change what the model *knows* — it changes how 
 
 ---
 
-## Deeper Evaluation: Rubric Quality Score
+## Legacy Rubric Quality Score
 
 Format compliance only checks whether sections exist and bullets are counted correctly — it says nothing about whether the content inside those sections is useful. To go one level deeper, a heuristic rubric scores each output on four dimensions (0–3 each, **12 total**):
 
@@ -410,7 +520,7 @@ Format compliance only checks whether sections exist and bullets are counted cor
 | **Limitation specificity** | Concreteness of the stated limitation | > 18 words, technical vocabulary |
 | **Follow-up quality** | Whether the question is well-formed | Ends with `?`, ≥ 8 words |
 
-Results averaged across all 10 test prompts:
+Results averaged across the original 10-prompt rank-sweep evaluation:
 
 | Model | Summary | Bullets | Limitation | Follow-up | **Total / 12** |
 |-------|:-------:|:-------:|:----------:|:---------:|:--------------:|
@@ -441,10 +551,12 @@ One-sentence takeaway: **rank and epochs both matter, but a low learning rate (1
 
 ## Limitations
 
-**Small dataset (68 examples).** The training set was hand-authored in a single style. The model generalises the *format* well, but outputs may be shallow or factually imprecise on topics far from the training distribution. Scaling to a few hundred diverse examples would likely improve both rubric depth and factual accuracy.
+**Synthetic dataset.** The current SFT dataset has 600 examples: 68 human-written gold records plus 532 local synthetic records. That is enough to demonstrate the data pipeline, fixed split, SFT training, and DPO workflow, but it is not a production domain dataset. A stronger version would add human review, duplicate audits, and broader source diversity.
 
-**Compliance ≠ quality.** The primary evaluation metric checks for the presence and count of template sections. A model that writes "Limitation: none." passes just as a model that writes a substantive two-sentence limitation — the rubric score partially compensates for this, but true quality measurement would require human evaluation or an LLM-as-judge setup (e.g. GPT-4 scoring each section on a 1–5 scale).
+**Compliance ≠ quality.** The primary evaluation metric checks for section names and bullet counts. DPO improves strict template reliability to 125/125, but the current heuristic content-alignment score is 83%, slightly below the SFT score of 86%. The honest claim is format reliability, not superior factual quality.
 
 **Heuristic rubric is not human judgment.** The rubric rewards length and vocabulary density as proxies for specificity. A fluent but incorrect limitation scores the same as a concise and accurate one. Pairwise human preference ratings would be the correct next step.
+
+**DPO pairs are synthetic hard negatives.** The DPO dataset currently uses deterministic near-miss rejected answers built from train/val examples. This directly targets known format failures without leaking the test split, but a stronger alignment claim should use SFT-sampled candidates with human or LLM-judge preference labels.
 
 **Single base model.** All experiments use `Qwen2.5-1.5B-Instruct`. Results may not transfer directly to other model families or sizes; larger models likely need lower ranks to reach the same compliance threshold.
